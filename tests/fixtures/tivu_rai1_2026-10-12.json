@@ -1,0 +1,16 @@
+{
+  "events": [
+    {"id": 1, "date_start": "11-10-2026 23:30", "date_end": "12-10-2026 00:40", "duration": 70,
+     "program": {"id": 11, "title": "Speciale notte", "description": "Approfondimento.", "url_poster": null, "categories": []}},
+    {"id": 2, "date_start": "12-10-2026 06:00", "date_end": "12-10-2026 06:30", "duration": 30,
+     "program": {"id": 12, "title": "Tg1", "description": "Notiziario.", "url_poster": "https://example.org/tg1.jpg",
+                 "categories": [{"id": 3, "name": "Informazione", "slug": "informazione"}]}},
+    {"id": 3, "date_start": "12-10-2026 06:30", "date_end": "12-10-2026 09:00", "duration": 150,
+     "program": {"id": 13, "title": "Unomattina", "description": "", "categories": [{"id": 12, "name": "Varie", "slug": "varie"}]}},
+    {"id": 4, "date_start": "12-10-2026 20:00", "date_end": "12-10-2026 20:30", "duration": 30,
+     "program": {"id": 14, "title": "Tg1", "description": "Edizione della sera.", "categories": []}},
+    {"id": 5, "date_start": "12-10-2026 21:30", "date_end": "13-10-2026 00:10", "duration": 160,
+     "program": {"id": 15, "title": "Film della sera", "description": "Prima visione.", "categories": [{"id": 1, "name": "Film", "slug": "film"}]}},
+    {"id": 6, "date_start": "12-10-2026 22:00", "date_end": "12-10-2026 22:10", "duration": 10, "program": null}
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "channels": [
+    {"id": 1, "name": "Rai 1", "icon": "uploads/channel/rai1.png", "is_dtt": false, "is_sat": true, "channel_dtt": 0, "channel_sat": 101},
+    {"id": 42, "name": "Rai 1 HD", "icon": "uploads/channel/rai1hd.png", "is_dtt": true, "is_sat": true, "channel_dtt": 1, "channel_sat": 1},
+    {"id": 145, "name": "Canale 5 HD", "icon": "uploads/channel/canale5hd.png", "is_dtt": true, "is_sat": true, "channel_dtt": 5, "channel_sat": 5},
+    {"id": 149, "name": "La7 HD", "icon": "uploads/channel/la7hd.png", "is_dtt": true, "is_sat": false, "channel_dtt": 7, "channel_sat": 0},
+    {"id": 128, "name": "Mezzo", "icon": "uploads/channel/mezzo.png", "is_dtt": false, "is_sat": true, "channel_dtt": 0, "channel_sat": 69}
+  ]
+}

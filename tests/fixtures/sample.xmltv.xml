@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<tv generator-info-name="seatv-test">
+  <channel id="Rai1.it">
+    <display-name>Rai 1</display-name>
+    <icon src="https://example.org/rai1.png"/>
+    <lcn>1</lcn>
+  </channel>
+  <channel id="Nove.it">
+    <display-name>NOVE</display-name>
+    <lcn>9</lcn>
+  </channel>
+  <programme start="20261012180000 +0200" stop="20261012190000 +0200" channel="Nove.it">
+    <title lang="it">Little Big Italy</title>
+    <desc lang="it">Viaggio tra i ristoranti italiani all'estero.</desc>
+    <category lang="it">Intrattenimento</category>
+  </programme>
+  <programme start="20261012190000 +0200" stop="20261012200000 +0200" channel="Nove.it">
+    <title lang="it">Cash or Trash</title>
+  </programme>
+  <programme start="20261014190000 +0200" stop="20261014200000 +0200" channel="Nove.it">
+    <title lang="it">Fuori intervallo</title>
+  </programme>
+  <programme start="20261012200000" stop="20261012210000" channel="Rai1.it">
+    <title lang="it">Tg1</title>
+  </programme>
+</tv>
