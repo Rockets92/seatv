@@ -207,16 +207,16 @@ class Database:
                     ORDER BY n.lcn IS NULL, n.lcn, c.name
                     """
                 ).fetchall()
-            numbers = self._numbers(conn)
-        return [self._channel(row, numbers) for row in rows]
+            numbers, sources = self._numbers(conn), self._sources(conn)
+        return [self._channel(row, numbers, sources) for row in rows]
 
     def get_channel(self, channel_id: str) -> dict | None:
         with self.connect() as conn:
             row = conn.execute("SELECT * FROM channels WHERE id = ?", (channel_id,)).fetchone()
             if row is None:
                 return None
-            numbers = self._numbers(conn, channel_id)
-        return self._channel(row, numbers)
+            numbers, sources = self._numbers(conn, channel_id), self._sources(conn, channel_id)
+        return self._channel(row, numbers, sources)
 
     def programmes_between(self, channel_id: str, start: datetime, end: datetime) -> list[dict]:
         """Programmi che iniziano in [start, end)."""
@@ -230,6 +230,22 @@ class Database:
                 (channel_id, to_db_time(start), to_db_time(end)),
             ).fetchall()
         return [self._programme(row) for row in rows]
+
+    def programmes_overlapping(self, start: datetime, end: datetime) -> dict[str, list[dict]]:
+        """Programmi di tutti i canali che sono in onda almeno in parte in [start, end)."""
+        with self.connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT * FROM programmes
+                WHERE stop > ? AND start < ?
+                ORDER BY channel_id, start
+                """,
+                (to_db_time(start), to_db_time(end)),
+            ).fetchall()
+        result: dict[str, list[dict]] = {}
+        for row in rows:
+            result.setdefault(row["channel_id"], []).append(self._programme(row))
+        return result
 
     def on_air(self, at: datetime, channel_ids: list[str] | None = None) -> dict[str, dict]:
         """Per ogni canale: il programma in onda in `at` e quello successivo."""
@@ -286,12 +302,27 @@ class Database:
         return numbers
 
     @staticmethod
-    def _channel(row: sqlite3.Row, numbers: dict[str, dict[str, int]]) -> dict:
+    def _sources(conn: sqlite3.Connection, channel_id: str | None = None) -> dict[str, list[str]]:
+        query = "SELECT DISTINCT channel_id, source FROM channel_sources"
+        if channel_id is None:
+            rows = conn.execute(query + " ORDER BY source").fetchall()
+        else:
+            rows = conn.execute(query + " WHERE channel_id = ? ORDER BY source", (channel_id,)).fetchall()
+        sources: dict[str, list[str]] = {}
+        for row in rows:
+            sources.setdefault(row["channel_id"], []).append(row["source"])
+        return sources
+
+    @staticmethod
+    def _channel(
+        row: sqlite3.Row, numbers: dict[str, dict[str, int]], sources: dict[str, list[str]]
+    ) -> dict:
         return {
             "id": row["id"],
             "name": row["name"],
             "logo": row["logo"],
             "numbers": numbers.get(row["id"], {}),
+            "sources": sources.get(row["id"], []),
         }
 
     @staticmethod
@@ -304,4 +335,5 @@ class Database:
             "description": row["description"],
             "category": row["category"],
             "image": row["image"],
+            "source": row["source"],
         }

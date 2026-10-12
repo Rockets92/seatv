@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SEA-TV Guida TV</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='4' fill='%233d8bfd'/%3E%3Cpath d='M6 4l6 4-6 4z' fill='white'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/guide.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <span class="logo-mark" aria-hidden="true">▶</span>
+    <div>
+      <h1>SEA-TV</h1>
+      <p class="tagline">Guida TV digitale terrestre e satellite</p>
+    </div>
+  </div>
+
+  <nav class="days" aria-label="Giorno">
+    <button type="button" id="prev-day" class="icon-btn" aria-label="Giorno precedente">‹</button>
+    <div class="day-list" id="day-list"></div>
+    <button type="button" id="next-day" class="icon-btn" aria-label="Giorno successivo">›</button>
+  </nav>
+
+  <button type="button" id="sources-toggle" class="sources-toggle" aria-expanded="false" aria-controls="sources-panel">
+    <span class="dot" id="sources-dot"></span> Fonti
+  </button>
+</header>
+
+<section id="sources-panel" class="sources-panel" hidden aria-label="Stato delle fonti"></section>
+
+<div class="toolbar">
+  <div class="tabs" role="tablist" aria-label="Piattaforma" id="platform-tabs">
+    <button type="button" role="tab" data-platform="" aria-selected="true">Tutti</button>
+    <button type="button" role="tab" data-platform="dtt" aria-selected="false">Digitale terrestre</button>
+    <button type="button" role="tab" data-platform="tivusat" aria-selected="false">Tivùsat</button>
+    <button type="button" role="tab" data-platform="sky" aria-selected="false">Sky</button>
+  </div>
+  <div class="filters">
+    <label class="select">
+      <span>Fonte</span>
+      <select id="source-filter"><option value="">Tutte</option></select>
+    </label>
+    <input type="search" id="search" placeholder="Cerca canale…" aria-label="Cerca canale">
+    <button type="button" id="jump-now" class="now-btn">Adesso</button>
+  </div>
+</div>
+
+<main id="guide" class="guide" aria-live="polite">
+  <div class="status" id="status">Caricamento della guida…</div>
+</main>
+
+<aside id="detail" class="detail" hidden aria-labelledby="detail-title">
+  <button type="button" class="close" id="detail-close" aria-label="Chiudi">×</button>
+  <div class="detail-image" id="detail-image"></div>
+  <div class="detail-body">
+    <p class="detail-channel" id="detail-channel"></p>
+    <h2 id="detail-title"></h2>
+    <p class="detail-time" id="detail-time"></p>
+    <div class="progress" id="detail-progress" hidden><span></span></div>
+    <p class="detail-meta" id="detail-meta"></p>
+    <p class="detail-desc" id="detail-desc"></p>
+  </div>
+</aside>
+<div class="backdrop" id="backdrop" hidden></div>
+
+<script src="/static/guide.js"></script>
+</body>
+</html>

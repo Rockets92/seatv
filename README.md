@@ -19,9 +19,20 @@ pip install -e ".[dev]"
 # Scarica subito i palinsesti (facoltativo: il server lo fa anche all'avvio)
 python -m seatv.ingest
 
-# Avvia l'API su http://localhost:8000 (documentazione interattiva su /docs)
+# Avvia su http://localhost:8000: guida TV su /, documentazione dell'API su /docs
 uvicorn seatv.main:create_app --factory
 ```
+
+## Guida TV web
+
+Aprendo http://localhost:8000/ si vede una guida TV interattiva: una riga per canale, gli orari in orizzontale e una linea rossa sull'ora attuale.
+
+- In alto si sceglie il giorno; il pulsante **Adesso** riporta all'ora attuale.
+- Le schede filtrano per piattaforma (digitale terrestre, Tivùsat, Sky) e mostrano i numeri di quella piattaforma.
+- Il menu **Fonte** mostra solo i canali di una fonte; il pulsante **Fonti** apre lo stato dell'ultimo aggiornamento di ciascuna.
+- Cliccando un programma si aprono orari, durata, genere, descrizione, immagine e fonte da cui arriva.
+
+La pagina è fatta di file statici (`seatv/static/`) che leggono `GET /guide` e `GET /health`.
 
 ## Endpoint
 
@@ -30,6 +41,7 @@ uvicorn seatv.main:create_app --factory
 | `GET /channels?platform=dtt\|tivusat\|sky` | Elenco canali. Con `platform`, solo quelli numerati su quella piattaforma, ordinati per numero (LCN). |
 | `GET /channels/{id}` | Un canale, es. `/channels/rai1`. |
 | `GET /channels/{id}/schedule?date=AAAA-MM-GG` | Palinsesto del giorno (ora italiana, default oggi): i programmi che iniziano in quel giorno. |
+| `GET /guide?date=AAAA-MM-GG&platform=...` | Tutti i canali con i programmi in onda nel giorno, anche solo in parte: i dati della griglia. |
 | `GET /channels/{id}/now?at=...` | Programma in onda e successivo su un canale. |
 | `GET /now?platform=dtt\|tivusat\|sky&at=...` | In onda ora e a seguire su tutti i canali. `at` è facoltativo; senza fuso orario si intende ora italiana. |
 | `GET /health` | Esito dell'ultima ingestione per ogni fonte; `degraded` se una fonte è fallita o non è ancora stata letta. |
@@ -37,10 +49,10 @@ uvicorn seatv.main:create_app --factory
 Esempio di canale:
 
 ```json
-{"id": "rai1", "name": "Rai 1", "logo": "https://services.tivulaguida.it/uploads/channel/....png", "numbers": {"dtt": 1, "tivusat": 1, "sky": 101}}
+{"id": "rai1", "name": "Rai 1", "logo": "https://services.tivulaguida.it/uploads/channel/....png", "numbers": {"dtt": 1, "tivusat": 1, "sky": 101}, "sources": ["sky", "tivu"]}
 ```
 
-Gli orari dei programmi sono restituiti in ora italiana con offset, es. `2026-10-12T20:00:00+02:00`.
+Gli orari dei programmi sono restituiti in ora italiana con offset, es. `2026-10-12T20:00:00+02:00`. Ogni programma indica anche la fonte (`"source": "tivu"`).
 
 ## Fonti
 
@@ -90,6 +102,7 @@ seatv/
   db.py            schema SQLite e query
   ingest.py        scaricamento e salvataggio (anche da riga di comando)
   main.py          app FastAPI e aggiornamento periodico
+  static/          pagina web della guida TV
   sources/
     tivu.py        fonte Tivù La Guida
     sky.py         fonte Sky Guida TV

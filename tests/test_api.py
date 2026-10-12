@@ -65,3 +65,25 @@ def test_health(loaded):
 
 def test_health_degraded_before_first_ingest(api):
     assert api.get("/health").json() == {"status": "degraded", "sources": []}
+
+
+def test_guide(loaded):
+    body = loaded.get("/guide", params={"date": "2026-10-12", "platform": "dtt"}).json()
+    assert body["date"] == "2026-10-12"
+    rows = {r["channel"]["id"]: r for r in body["channels"]}
+    assert list(rows) == ["rai1", "canale5", "la7"]
+    assert rows["rai1"]["channel"]["sources"] == ["tivu"]
+    titles = [p["title"] for p in rows["rai1"]["programmes"]]
+    # A differenza di /schedule, la griglia include anche il programma iniziato
+    # il giorno prima e ancora in onda dopo mezzanotte.
+    assert titles == ["Speciale notte", "Tg1", "Unomattina", "Tg1", "Film della sera"]
+    assert rows["rai1"]["programmes"][1]["source"] == "tivu"
+    assert rows["la7"]["programmes"] == []
+
+
+def test_web_page(api):
+    page = api.get("/")
+    assert page.status_code == 200
+    assert "SEA-TV" in page.text
+    assert api.get("/static/guide.js").status_code == 200
+    assert api.get("/static/guide.css").status_code == 200

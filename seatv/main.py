@@ -6,9 +6,12 @@ import asyncio
 import logging
 from contextlib import asynccontextmanager, suppress
 from datetime import date, datetime, time, timedelta, timezone
+from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from seatv.config import ROME, Settings
@@ -16,6 +19,8 @@ from seatv.db import Database
 from seatv.ingest import run_ingest
 
 log = logging.getLogger(__name__)
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 # dtt = digitale terrestre, tivusat e sky = le due piattaforme satellitari.
 Platform = Literal["dtt", "tivusat", "sky"]
@@ -27,6 +32,8 @@ class Channel(BaseModel):
     logo: str | None
     # Numero del canale per piattaforma, es. {"dtt": 1, "tivusat": 1, "sky": 101}.
     numbers: dict[str, int]
+    # Fonti che elencano il canale, es. ["sky", "tivu"].
+    sources: list[str]
 
 
 class Programme(BaseModel):
@@ -36,12 +43,24 @@ class Programme(BaseModel):
     description: str | None
     category: str | None
     image: str | None
+    # Fonte da cui arriva il programma.
+    source: str
 
 
 class Schedule(BaseModel):
     channel: Channel
     date: date
     programmes: list[Programme]
+
+
+class GuideRow(BaseModel):
+    channel: Channel
+    programmes: list[Programme]
+
+
+class Guide(BaseModel):
+    date: date
+    channels: list[GuideRow]
 
 
 class OnAir(BaseModel):
@@ -73,6 +92,7 @@ def _programme(data: dict) -> Programme:
         description=data["description"],
         category=data["category"],
         image=data["image"],
+        source=data["source"],
     )
 
 
@@ -115,6 +135,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             raise HTTPException(status_code=404, detail="canale non trovato")
         return Channel(**channel)
 
+    @app.get("/", include_in_schema=False)
+    def index() -> FileResponse:
+        return FileResponse(STATIC_DIR / "index.html")
+
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
     @app.get("/health", response_model=Health)
     def health() -> Health:
         runs = db.last_runs()
@@ -142,6 +168,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=ROME)
         programmes = db.programmes_between(channel_id, start, end)
         return Schedule(channel=channel, date=day, programmes=[_programme(p) for p in programmes])
+
+    @app.get("/guide", response_model=Guide)
+    def guide(
+        day: date | None = Query(None, alias="date", description="Giorno (ora italiana), default oggi"),
+        platform: Platform | None = None,
+    ) -> Guide:
+        """Tutti i canali con i programmi in onda nel giorno, anche solo in parte:
+        i dati per una griglia stile guida TV."""
+        day = day or datetime.now(ROME).date()
+        start = datetime.combine(day, time.min, tzinfo=ROME)
+        end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=ROME)
+        programmes = db.programmes_overlapping(start, end)
+        rows = [
+            GuideRow(channel=Channel(**c), programmes=[_programme(p) for p in programmes.get(c["id"], [])])
+            for c in db.list_channels(platform)
+        ]
+        return Guide(date=day, channels=rows)
 
     @app.get("/channels/{channel_id}/now", response_model=OnAir)
     def channel_now(channel_id: str, at: datetime | None = None) -> OnAir:
