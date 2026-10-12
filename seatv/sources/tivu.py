@@ -1,21 +1,17 @@
 """Tivù La Guida (services.tivulaguida.it): DTT nazionale e Tivùsat.
 
 Endpoint e formato ricavati dal grabber `sites/tivu.tv` di iptv-org/epg.
-L'API riporta anche la numerazione: `channel_dtt` e `channel_sat`.
+L'API riporta anche la numerazione: `channel_dtt` (DTT) e `channel_sat` (Tivùsat).
 """
 
 from __future__ import annotations
 
-import asyncio
-import logging
 from datetime import date, datetime
 
 import httpx
 
 from seatv.config import ROME
-from seatv.sources import SourceChannel, SourceProgramme
-
-log = logging.getLogger(__name__)
+from seatv.sources import SourceChannel, SourceProgramme, fetch_each_day
 
 BASE_URL = "https://services.tivulaguida.it"
 TIME_FORMAT = "%d-%m-%Y %H:%M"
@@ -28,7 +24,7 @@ def parse_channels(payload: dict) -> list[SourceChannel]:
         if item.get("is_dtt") and item.get("channel_dtt"):
             numbers["dtt"] = int(item["channel_dtt"])
         if item.get("is_sat") and item.get("channel_sat"):
-            numbers["sat"] = int(item["channel_sat"])
+            numbers["tivusat"] = int(item["channel_sat"])
         icon = item.get("icon")
         channels.append(
             SourceChannel(
@@ -84,18 +80,10 @@ class TivuSource:
         channels: list[SourceChannel],
         days: list[date],
     ) -> list[SourceProgramme]:
-        semaphore = asyncio.Semaphore(self.concurrency)
-
-        async def one(channel: SourceChannel, day: date) -> list[SourceProgramme]:
+        async def fetch(channel: SourceChannel, day: date) -> list[SourceProgramme]:
             url = f"{BASE_URL}/api/epg/channels/{channel.source_id}/date/{day.isoformat()}"
-            async with semaphore:
-                try:
-                    response = await client.get(url)
-                    response.raise_for_status()
-                    return parse_events(response.json(), channel.source_id)
-                except (httpx.HTTPError, ValueError) as exc:
-                    log.warning("tivu: %s (%s) %s non scaricato: %s", channel.name, channel.source_id, day, exc)
-                    return []
+            response = await client.get(url)
+            response.raise_for_status()
+            return parse_events(response.json(), channel.source_id)
 
-        results = await asyncio.gather(*(one(c, d) for c in channels for d in days))
-        return [p for batch in results for p in batch]
+        return await fetch_each_day(self.name, channels, days, self.concurrency, fetch)

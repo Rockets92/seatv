@@ -18,8 +18,9 @@ def _bool(value: str | None, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     db_path: str = "data/seatv.sqlite3"
-    # Fonti da interrogare, in ordine: "tivu", "xmltv".
-    sources: tuple[str, ...] = ("tivu",)
+    # Fonti da interrogare: "tivu", "sky", "xmltv". Se due fonti coprono lo
+    # stesso canale, vince la prima.
+    sources: tuple[str, ...] = ("tivu", "sky")
     xmltv_url: str | None = None
     # Giorni di palinsesto da scaricare a partire da oggi.
     days_ahead: int = 2
@@ -35,7 +36,7 @@ class Settings:
         env = os.environ
         sources = tuple(
             s.strip().lower()
-            for s in env.get("SEATV_SOURCES", "tivu").split(",")
+            for s in env.get("SEATV_SOURCES", ",".join(cls.sources)).split(",")
             if s.strip()
         )
         return cls(

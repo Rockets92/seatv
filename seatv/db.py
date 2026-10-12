@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS channels (
 
 CREATE TABLE IF NOT EXISTS channel_numbers (
     channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-    platform   TEXT NOT NULL CHECK (platform IN ('dtt', 'sat')),
+    platform   TEXT NOT NULL,
     lcn        INTEGER NOT NULL,
     PRIMARY KEY (channel_id, platform)
 );
@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS ingest_runs (
 );
 """
 
-PLATFORMS = ("dtt", "sat")
+PLATFORMS = ("dtt", "tivusat", "sky")
 
 
 def to_db_time(value: datetime) -> str:
@@ -99,11 +99,11 @@ class Database:
         numbers: dict[str, int],
         now: datetime,
     ) -> None:
+        """Il nome resta quello della prima fonte che ha visto il canale."""
         conn.execute(
             """
             INSERT INTO channels (id, name, logo, updated_at) VALUES (?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE SET
-                name = excluded.name,
                 logo = COALESCE(excluded.logo, channels.logo),
                 updated_at = excluded.updated_at
             """,

@@ -16,6 +16,7 @@ import httpx
 from seatv.config import ROME, Settings
 from seatv.db import Database
 from seatv.sources import Source, SourceChannel, clean_name
+from seatv.sources.sky import SkySource
 from seatv.sources.tivu import TivuSource
 from seatv.sources.xmltv import XmltvSource
 
@@ -35,6 +36,8 @@ def build_sources(settings: Settings) -> list[Source]:
     for name in settings.sources:
         if name == "tivu":
             sources.append(TivuSource(concurrency=settings.http_concurrency))
+        elif name == "sky":
+            sources.append(SkySource(concurrency=settings.http_concurrency))
         elif name == "xmltv":
             if not settings.xmltv_url:
                 raise ValueError("la fonte xmltv richiede SEATV_XMLTV_URL")
@@ -63,7 +66,14 @@ async def ingest_source(
     client: httpx.AsyncClient,
     days: list[date],
     now: datetime,
+    covered: set[str] | None = None,
 ) -> IngestResult:
+    """Salva canali e programmi di una fonte.
+
+    `covered` contiene i canali di cui una fonte precedente ha già fornito il
+    palinsesto in questo giro: per quelli si aggiornano solo numeri e logo.
+    """
+    covered = covered if covered is not None else set()
     result = IngestResult(source=source.name)
     channels = await source.fetch_channels(client)
 
@@ -81,7 +91,8 @@ async def ingest_source(
                 db.link_source(conn, source.name, channel.source_id, cid)
     result.channels = len(groups)
 
-    programmes = await source.fetch_programmes(client, list(representatives.values()), days)
+    wanted = [rep for cid, rep in representatives.items() if cid not in covered]
+    programmes = await source.fetch_programmes(client, wanted, days)
     by_source_id = {rep.source_id: cid for cid, rep in representatives.items()}
     per_channel: dict[str, list] = defaultdict(list)
     for p in programmes:
@@ -92,7 +103,10 @@ async def ingest_source(
 
     with db.connect() as conn:
         for cid, rows in per_channel.items():
-            result.programmes += db.replace_programmes(conn, cid, source.name, rows)
+            written = db.replace_programmes(conn, cid, source.name, rows)
+            if written:
+                covered.add(cid)
+            result.programmes += written
     return result
 
 
@@ -116,11 +130,12 @@ async def run_ingest(
             follow_redirects=True,
         )
     results = []
+    covered: set[str] = set()
     try:
         for source in sources:
             run_id = db.start_run(source.name, now)
             try:
-                result = await ingest_source(db, source, client, days, now)
+                result = await ingest_source(db, source, client, days, now, covered)
             except Exception as exc:  # una fonte rotta non deve fermare le altre
                 log.exception("ingestione %s fallita", source.name)
                 result = IngestResult(source=source.name, error=f"{type(exc).__name__}: {exc}")

@@ -1,0 +1,10 @@
+{
+  "channels": [
+    {"id": 9001, "name": "Sky TG24", "number": 100, "logo": "/logo/skytg24_Light_Fit.png", "category": {"id": 1, "name": "News"}},
+    {"id": 8001, "name": "Rai 1 HD", "number": 101, "logo": "/logo/rai1hd_Light_Fit.png", "category": {"id": 3, "name": "Intrattenimento"}},
+    {"id": 8005, "name": "Canale 5 HD", "number": 105, "logo": "/logo/canale5hd_Light_Fit.png", "category": {"id": 3, "name": "Intrattenimento"}},
+    {"id": 9115, "name": "Sky Uno", "number": 108, "logo": "/logo/skyuno_Light_Fit.png", "category": {"id": 3, "name": "Intrattenimento"}},
+    {"id": 9114, "name": "Sky Uno +1", "number": 109, "logo": "/logo/skyuno1_Light_Fit.png", "category": {"id": 3, "name": "Intrattenimento"}}
+  ],
+  "total": 5
+}

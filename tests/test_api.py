@@ -17,7 +17,7 @@ def loaded(api, settings, tivu_client):
 def test_channels(loaded):
     response = loaded.get("/channels", params={"platform": "dtt"})
     assert response.status_code == 200
-    assert [(c["id"], c["numbers"]["dtt"]) for c in response.json()] == [("rai-1", 1), ("canale-5", 5), ("la7", 7)]
+    assert [(c["id"], c["numbers"]["dtt"]) for c in response.json()] == [("rai1", 1), ("canale5", 5), ("la7", 7)]
     assert len(loaded.get("/channels").json()) == 4
 
 
@@ -31,27 +31,27 @@ def test_bad_platform(loaded):
 
 
 def test_schedule(loaded):
-    response = loaded.get("/channels/rai-1/schedule", params={"date": "2026-10-12"})
+    response = loaded.get("/channels/rai1/schedule", params={"date": "2026-10-12"})
     assert response.status_code == 200
     body = response.json()
     assert body["channel"]["name"] == "Rai 1"
     # Lo "Speciale notte" iniziato l'11 non appartiene al 12.
     assert [p["title"] for p in body["programmes"]] == ["Tg1", "Unomattina", "Tg1", "Film della sera"]
     assert body["programmes"][0]["start"] == "2026-10-12T06:00:00+02:00"
-    assert loaded.get("/channels/rai-1/schedule", params={"date": "2026-10-20"}).json()["programmes"] == []
+    assert loaded.get("/channels/rai1/schedule", params={"date": "2026-10-20"}).json()["programmes"] == []
 
 
 def test_now(loaded):
     response = loaded.get("/now", params={"platform": "dtt", "at": "2026-10-12T07:00:00+02:00"})
     assert response.status_code == 200
     entries = {e["channel"]["id"]: e for e in response.json()}
-    assert entries["rai-1"]["now"]["title"] == "Unomattina"
-    assert entries["rai-1"]["next"]["start"] == "2026-10-12T20:00:00+02:00"
+    assert entries["rai1"]["now"]["title"] == "Unomattina"
+    assert entries["rai1"]["next"]["start"] == "2026-10-12T20:00:00+02:00"
     assert entries["la7"]["now"] is None
 
 
 def test_channel_now_naive_time_is_rome(loaded):
-    body = loaded.get("/channels/rai-1/now", params={"at": "2026-10-12T21:00:00"}).json()
+    body = loaded.get("/channels/rai1/now", params={"at": "2026-10-12T21:00:00"}).json()
     assert body["now"] is None
     assert body["next"]["title"] == "Film della sera"
 

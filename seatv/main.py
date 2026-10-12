@@ -17,14 +17,15 @@ from seatv.ingest import run_ingest
 
 log = logging.getLogger(__name__)
 
-Platform = Literal["dtt", "sat"]
+# dtt = digitale terrestre, tivusat e sky = le due piattaforme satellitari.
+Platform = Literal["dtt", "tivusat", "sky"]
 
 
 class Channel(BaseModel):
     id: str
     name: str
     logo: str | None
-    # Numero del canale per piattaforma, es. {"dtt": 1, "sat": 1}.
+    # Numero del canale per piattaforma, es. {"dtt": 1, "tivusat": 1, "sky": 101}.
     numbers: dict[str, int]
 
 
@@ -101,7 +102,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app = FastAPI(
         title="SEA-TV API",
-        description="Guida TV dei canali italiani del digitale terrestre (dtt) e del satellite (sat).",
+        description="Guida TV dei canali italiani del digitale terrestre (dtt) e del satellite (tivusat, sky).",
         version="0.1.0",
         lifespan=lifespan,
     )

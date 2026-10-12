@@ -1,0 +1,116 @@
+"""Sky Guida TV (apid.sky.it/gtv/v1): piattaforma satellitare Sky Italia.
+
+Endpoint e formato ricavati dal grabber `sites/guidatv.sky.it` di iptv-org/epg.
+I numeri restituiti sono quelli del decoder Sky (es. Rai 1 = 101).
+"""
+
+from __future__ import annotations
+
+from datetime import date, datetime, time, timedelta, timezone
+
+import httpx
+
+from seatv.config import ROME
+from seatv.sources import SourceChannel, SourceProgramme, fetch_each_day
+
+API_URL = "https://apid.sky.it/gtv/v1"
+SITE_URL = "https://guidatv.sky.it"
+# DTH = satellite.
+ENV = "DTH"
+
+
+def _utc(value: datetime) -> str:
+    return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def _parse_time(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def parse_channels(payload: dict) -> list[SourceChannel]:
+    channels = []
+    for item in payload.get("channels") or []:
+        if not item.get("id") or not item.get("name"):
+            continue
+        number = item.get("number")
+        channels.append(
+            SourceChannel(
+                source_id=str(item["id"]),
+                name=item["name"].strip(),
+                # I loghi Sky sono percorsi relativi di cui non è noto l'host: si
+                # tiene quello di Tivù quando il canale c'è anche lì.
+                logo=None,
+                numbers={"sky": int(number)} if number else {},
+            )
+        )
+    return channels
+
+
+def parse_events(payload: dict, source_channel_id: str) -> list[SourceProgramme]:
+    programmes = []
+    for event in payload.get("events") or []:
+        title = (event.get("eventTitle") or "").strip()
+        if not title or not event.get("starttime") or not event.get("endtime"):
+            continue
+        try:
+            start = _parse_time(event["starttime"])
+            stop = _parse_time(event["endtime"])
+        except ValueError:
+            continue
+        content = event.get("content") or {}
+        genre = (content.get("genre") or {}).get("name")
+        subgenre = (content.get("subgenre") or {}).get("name")
+        cover = next(
+            (i.get("img", {}).get("url") for i in content.get("imagesMap") or [] if i.get("key") == "cover"),
+            None,
+        )
+        programmes.append(
+            SourceProgramme(
+                source_channel_id=source_channel_id,
+                start=start,
+                stop=stop,
+                title=title,
+                description=(event.get("eventSynopsis") or "").strip() or None,
+                category=f"{genre}/{subgenre}" if genre and subgenre else genre,
+                image=f"{SITE_URL}{cover}" if cover else None,
+            )
+        )
+    return programmes
+
+
+class SkySource:
+    name = "sky"
+
+    def __init__(self, concurrency: int = 4) -> None:
+        self.concurrency = concurrency
+
+    async def fetch_channels(self, client: httpx.AsyncClient) -> list[SourceChannel]:
+        response = await client.get(f"{API_URL}/channels", params={"env": ENV})
+        response.raise_for_status()
+        return parse_channels(response.json())
+
+    async def fetch_programmes(
+        self,
+        client: httpx.AsyncClient,
+        channels: list[SourceChannel],
+        days: list[date],
+    ) -> list[SourceProgramme]:
+        async def fetch(channel: SourceChannel, day: date) -> list[SourceProgramme]:
+            # Il giorno va da mezzanotte a mezzanotte, ora italiana.
+            start = datetime.combine(day, time.min, tzinfo=ROME)
+            end = datetime.combine(day + timedelta(days=1), time.min, tzinfo=ROME)
+            response = await client.get(
+                f"{API_URL}/events",
+                params={
+                    "from": _utc(start),
+                    "to": _utc(end),
+                    "pageSize": 999,
+                    "pageNum": 0,
+                    "env": ENV,
+                    "channels": channel.source_id,
+                },
+            )
+            response.raise_for_status()
+            return parse_events(response.json(), channel.source_id)
+
+        return await fetch_each_day(self.name, channels, days, self.concurrency, fetch)

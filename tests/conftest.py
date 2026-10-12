@@ -32,6 +32,24 @@ def tivu_handler(request: httpx.Request) -> httpx.Response:
     return httpx.Response(200, json={"events": []})
 
 
+def sky_handler(requests: list[httpx.Request]):
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.url.path == "/gtv/v1/channels":
+            return httpx.Response(200, json=load("sky_channels.json"))
+        params = request.url.params
+        if params.get("channels") == "9001" and params.get("from") == "2026-10-11T22:00:00Z":
+            return httpx.Response(200, json=load("sky_tg24_2026-10-12.json"))
+        return httpx.Response(200, json={"events": []})
+
+    return handler
+
+
+def combined_handler(requests: list[httpx.Request]):
+    sky = sky_handler(requests)
+    return lambda request: sky(request) if request.url.host == "apid.sky.it" else tivu_handler(request)
+
+
 @pytest.fixture
 def settings(tmp_path) -> Settings:
     return Settings(db_path=str(tmp_path / "test.sqlite3"), scheduler_enabled=False, days_ahead=2)

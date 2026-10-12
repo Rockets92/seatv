@@ -6,13 +6,17 @@ li unisce nel database usando l'id canale normalizzato (vedi `channel_slug`).
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import re
 import unicodedata
 from dataclasses import dataclass, field
 from datetime import date, datetime
-from typing import Protocol
+from typing import Awaitable, Callable, Protocol
 
 import httpx
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -22,7 +26,7 @@ class SourceChannel:
     source_id: str
     name: str
     logo: str | None = None
-    # Numerazione per piattaforma: {"dtt": 1, "sat": 101}.
+    # Numerazione per piattaforma: {"dtt": 1, "tivusat": 1, "sky": 101}.
     numbers: dict[str, int] = field(default_factory=dict)
 
     @property
@@ -54,19 +58,52 @@ class Source(Protocol):
     ) -> list[SourceProgramme]: ...
 
 
-_HD_SUFFIX = re.compile(r"\s+hd$", re.IGNORECASE)
+_HD = re.compile(r"\s*\bhd\b", re.IGNORECASE)
+
+# Nomi che le fonti scrivono in modo diverso per lo stesso canale.
+ALIASES = {
+    "mediasetitalia2": "italia2",
+    "la7d": "la7cinema",
+}
 
 
 def clean_name(name: str) -> str:
     """Nome da mostrare: "Rai 1 HD" -> "Rai 1"."""
-    return _HD_SUFFIX.sub("", name.strip())
+    return re.sub(r"\s+", " ", _HD.sub("", name)).strip()
 
 
 def channel_slug(name: str) -> str:
-    """Id canale stabile: "Rai 1 HD" -> "rai-1", "Real time HD" -> "real-time".
+    """Id canale stabile, uguale tra le fonti.
 
-    Il suffisso HD viene tolto perché le fonti elencano spesso la versione SD e
-    quella HD dello stesso canale, che hanno lo stesso palinsesto.
+    "Rai 1 HD" -> "rai1", "20 Mediaset HD" e "20Mediaset HD" -> "20mediaset",
+    "Sky Uno +1" -> "skyunoplus1". La sigla HD viene tolta perché le fonti
+    elencano spesso la versione SD e quella HD dello stesso canale, che hanno
+    lo stesso palinsesto.
     """
-    name = unicodedata.normalize("NFKD", clean_name(name)).encode("ascii", "ignore").decode()
-    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
+    name = clean_name(name).replace("+", " plus ")
+    name = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    slug = re.sub(r"[^a-z0-9]+", "", name.lower())
+    return ALIASES.get(slug, slug)
+
+
+async def fetch_each_day(
+    source: str,
+    channels: list[SourceChannel],
+    days: list[date],
+    concurrency: int,
+    fetch: Callable[[SourceChannel, date], Awaitable[list[SourceProgramme]]],
+) -> list[SourceProgramme]:
+    """Chiama `fetch` per ogni canale e giorno, con un limite di richieste in
+    parallelo. Un canale o un giorno che fallisce viene saltato e registrato."""
+    semaphore = asyncio.Semaphore(concurrency)
+
+    async def one(channel: SourceChannel, day: date) -> list[SourceProgramme]:
+        async with semaphore:
+            try:
+                return await fetch(channel, day)
+            except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
+                log.warning("%s: %s (%s) %s non scaricato: %s", source, channel.name, channel.source_id, day, exc)
+                return []
+
+    results = await asyncio.gather(*(one(c, d) for c in channels for d in days))
+    return [p for batch in results for p in batch]

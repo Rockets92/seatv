@@ -3,9 +3,10 @@ from datetime import datetime, timezone
 import httpx
 import pytest
 
-from conftest import FIXTURES, NOW
+from conftest import FIXTURES, NOW, combined_handler
 
 from seatv.ingest import run_ingest
+from seatv.sources.sky import SkySource
 from seatv.sources.tivu import TivuSource
 from seatv.sources.xmltv import XmltvSource
 
@@ -18,12 +19,12 @@ async def test_tivu_ingest(settings, db, tivu_client):
     assert result.channels == 4
     assert result.programmes == 5
 
-    rai1 = db.get_channel("rai-1")
+    rai1 = db.get_channel("rai1")
     assert rai1["name"] == "Rai 1"
-    # Sul satellite vince il numero più basso (1 per la versione HD, non 101).
-    assert rai1["numbers"] == {"dtt": 1, "sat": 1}
-    assert [c["id"] for c in db.list_channels("dtt")] == ["rai-1", "canale-5", "la7"]
-    assert [c["id"] for c in db.list_channels("sat")] == ["rai-1", "canale-5", "mezzo"]
+    # Su Tivùsat vince il numero più basso (1 per la versione HD, non 101).
+    assert rai1["numbers"] == {"dtt": 1, "tivusat": 1}
+    assert [c["id"] for c in db.list_channels("dtt")] == ["rai1", "canale5", "la7"]
+    assert [c["id"] for c in db.list_channels("tivusat")] == ["rai1", "canale5", "mezzo"]
     assert db.last_runs()[0]["programmes"] == 5
 
 
@@ -48,7 +49,7 @@ async def test_reingest_replaces_moved_programmes(settings, db, tivu_client):
 
     day_start = datetime(2026, 10, 11, 22, 0, tzinfo=timezone.utc)
     day_end = datetime(2026, 10, 12, 22, 0, tzinfo=timezone.utc)
-    titles = [(p["start"].hour, p["start"].minute, p["title"]) for p in db.programmes_between("rai-1", day_start, day_end)]
+    titles = [(p["start"].hour, p["start"].minute, p["title"]) for p in db.programmes_between("rai1", day_start, day_end)]
     # Unomattina delle 06:30 è sparito; i programmi fuori dalla finestra nuova restano.
     assert titles == [(4, 0, "Tg1"), (4, 35, "Unomattina"), (18, 0, "Tg1"), (19, 30, "Film della sera")]
 
@@ -70,3 +71,26 @@ async def test_broken_source_is_recorded(settings, db):
     [result] = await run_ingest(settings, db, client=client, sources=[TivuSource()], now=NOW)
     assert result.error and "503" in result.error
     assert db.last_runs()[0]["error"] == result.error
+
+
+@pytest.mark.anyio
+async def test_tivu_and_sky_ingest(settings, db):
+    requests: list[httpx.Request] = []
+    client = httpx.AsyncClient(transport=httpx.MockTransport(combined_handler(requests)))
+    results = await run_ingest(settings, db, client=client, sources=[TivuSource(), SkySource()], now=NOW)
+    assert [r.error for r in results] == [None, None]
+
+    # Rai 1 di Tivù e "Rai 1 HD" di Sky sono lo stesso canale, con nome e logo di Tivù.
+    rai1 = db.get_channel("rai1")
+    assert rai1["numbers"] == {"dtt": 1, "tivusat": 1, "sky": 101}
+    assert rai1["name"] == "Rai 1"
+    assert rai1["logo"].startswith("https://services.tivulaguida.it/")
+    assert [c["id"] for c in db.list_channels("sky")] == ["skytg24", "rai1", "canale5", "skyuno", "skyunoplus1"]
+
+    # Il palinsesto di Rai 1 arriva già da Tivù: a Sky non viene richiesto.
+    sky_event_channels = {r.url.params.get("channels") for r in requests if r.url.path == "/gtv/v1/events"}
+    assert "8001" not in sky_event_channels
+    # Canale 5 su Tivù non ha dati (errore 500), quindi si prova con Sky.
+    assert "8005" in sky_event_channels
+    assert results[1].programmes == 2
+    assert db.on_air(NOW, ["skytg24"])["skytg24"]["now"]["title"] == "Buongiorno"
