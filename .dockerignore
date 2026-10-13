@@ -1,0 +1,10 @@
+.git
+.venv
+.env
+data
+tests
+docs
+deploy/*
+!deploy/docker-entrypoint.sh
+**/__pycache__
+*.sqlite3

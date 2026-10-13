@@ -8,14 +8,61 @@ Questa guida mette SEA-TV su un server Linux con Plesk Obsidian, con:
 
 Nell'esempio il dominio è `tv.example.it`, l'abbonamento Plesk è `example.it` con utente di sistema `exampleuser`, e il progetto sta in `/var/www/vhosts/example.it/seatv`, fuori da `httpdocs`, così codice, impostazioni e database non sono scaricabili dal web. Sostituisci questi valori con i tuoi.
 
-Ci sono due modi di far girare l'applicazione; la preparazione e l'aggiornamento quotidiano sono uguali per entrambi.
+Ci sono tre modi di far girare l'applicazione:
 
-| | A. uvicorn + proxy nginx (consigliato) | B. Phusion Passenger |
-|---|---|---|
-| Serve | accesso SSH come root (VPS o server dedicato) | il componente Passenger di Plesk, anche senza root |
-| Come gira | servizio systemd sempre attivo | Plesk avvia e ferma l'app da solo |
+| | Docker | A. uvicorn + proxy nginx | B. Phusion Passenger |
+|---|---|---|---|
+| Serve | l'estensione Docker di Plesk | accesso SSH come root | il componente Passenger di Plesk |
+| Python sul server | non serve, è nell'immagine | 3.11 o più recente | 3.11 o più recente |
+| Aggiornamento alle 05:00 | dentro il container | attività pianificata di Plesk | attività pianificata di Plesk |
 
-## 1. Preparazione (entrambi i modi)
+Docker è il più semplice se l'estensione è disponibile: è descritto subito qui sotto. Per A e B si parte dalla sezione 1.
+
+## Con Docker
+
+L'immagine contiene già Python e tutto il necessario. All'avvio scarica la guida e poi la riscarica ogni giorno alle 05:00 ora italiana (`SEATV_REFRESH_AT`), quindi non serve nessuna attività pianificata. Il database sta nel volume `/data` e sopravvive agli aggiornamenti del container.
+
+Installa l'estensione da `Estensioni` > cerca **Docker** > Installa, e crea il dominio con il certificato Let's Encrypt come al punto 1 della sezione successiva.
+
+### Con accesso SSH come root (consigliato)
+
+```bash
+cd /opt
+git clone https://github.com/Rockets92/seatv.git
+cd seatv
+cp deploy/env.example .env
+python3 -c "import secrets; print(secrets.token_urlsafe(32))"   # o qualunque stringa lunga e casuale
+nano .env       # metti la chiave in SEATV_API_KEYS; SEATV_DB_PATH e SEATV_SCHEDULER li imposta già docker-compose.yml
+docker compose up -d --build
+docker compose logs -f   # attendi le righe "ingestione tivu/sky: N canali", poi Ctrl+C
+```
+
+Il container ascolta solo su `127.0.0.1:8000`. Per pubblicarlo sul dominio, in Plesk vai su `tv.example.it` > **Impostazioni Apache e nginx** > **Direttive nginx aggiuntive** e incolla il blocco `location ~ ^/ { ... }` della sezione 3A.
+
+Per aggiornare il codice: `git pull && docker compose up -d --build`. I dati restano nel volume.
+
+### Solo dall'interfaccia di Plesk, senza SSH
+
+1. Sul tuo PC, con Docker Desktop, nella cartella del progetto:
+
+   ```bash
+   docker build -t seatv .
+   docker save seatv -o seatv.tar
+   ```
+
+2. In Plesk: **Docker** > **Immagini** > **Carica** e scegli `seatv.tar`.
+3. Sull'immagine `seatv` premi **Esegui** e, nelle impostazioni del container:
+   - **Avvio automatico** dopo il riavvio: attivo;
+   - **Mappatura porte** manuale: porta del container `8000`, porta esterna `8000`, e lascia attivo "solo locale" (in ascolto su 127.0.0.1);
+   - **Volumi**: cartella dell'host, es. `/var/www/vhosts/example.it/seatv-data`, montata su `/data`;
+   - **Variabili d'ambiente**: `SEATV_API_KEYS` con la tua chiave (le altre hanno già i valori giusti nell'immagine).
+4. Nel dominio vai su **Hosting e DNS** > **Regole proxy Docker** > **Aggiungi regola**: URL `/`, container `seatv`, porta `8000`.
+
+Per aggiornare: ricostruisci e ricarica l'immagine, poi ricrea il container con le stesse impostazioni (il volume conserva i dati).
+
+Le sezioni "Usare l'API da fuori" e "Se qualcosa non va" più sotto valgono anche per Docker; i log si vedono con `docker compose logs` o nella scheda del container in Plesk.
+
+## 1. Preparazione (A e B)
 
 1. In Plesk crea il dominio o sottodominio (`Siti web e domini` > `Aggiungi sottodominio`) e attiva il certificato gratuito **Let's Encrypt** (`SSL/TLS`), con il reindirizzamento da HTTP a HTTPS.
 2. Serve **Python 3.11 o più recente**. Controlla con `python3 --version`; se è più vecchio installa `python3.11` o `python3.12` dai pacchetti della distribuzione (su AlmaLinux/Rocky: `dnf install python3.12`; su Ubuntu 22.04: `apt install python3.11 python3.11-venv`) e usa quel comando al posto di `python3` qui sotto.

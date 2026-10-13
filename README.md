@@ -29,6 +29,8 @@ uvicorn seatv.main:create_app --factory
 
 Per metterlo su Plesk, con aggiornamento quotidiano a un'ora fissa e API protetta da chiave, segui [docs/plesk.md](docs/plesk.md).
 
+Con Docker basta `docker compose up -d --build` (impostazioni in `.env`, vedi `deploy/env.example`): il container scarica la guida all'avvio e ogni giorno alle 05:00, e tiene il database nel volume `/data`.
+
 ## Guida TV web
 
 Aprendo http://localhost:8000/ si vede una guida TV interattiva con i colori del logo: in cima le schede di ciò che è in onda ora, sotto la griglia con una riga per canale, gli orari in orizzontale e una linea azzurra sull'ora attuale. Da telefono la colonna dei canali mostra solo il logo con il numero.
@@ -116,6 +118,7 @@ I test non usano la rete: le risposte delle fonti sono simulate con i file in `t
 
 ```
 passenger_wsgi.py  avvio sotto Phusion Passenger (Plesk)
+Dockerfile         immagine Docker; docker-compose.yml per avviarla
 deploy/            script di aggiornamento, servizio systemd ed esempio di .env
 docs/plesk.md      installazione su Plesk
 seatv/
