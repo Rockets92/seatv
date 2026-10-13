@@ -99,12 +99,12 @@ class Database:
         numbers: dict[str, int],
         now: datetime,
     ) -> None:
-        """Il nome resta quello della prima fonte che ha visto il canale."""
+        """Nome e logo restano quelli della prima fonte che ha visto il canale."""
         conn.execute(
             """
             INSERT INTO channels (id, name, logo, updated_at) VALUES (?, ?, ?, ?)
             ON CONFLICT (id) DO UPDATE SET
-                logo = COALESCE(excluded.logo, channels.logo),
+                logo = COALESCE(channels.logo, excluded.logo),
                 updated_at = excluded.updated_at
             """,
             (channel_id, name, logo, to_db_time(now)),

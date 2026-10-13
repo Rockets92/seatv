@@ -18,6 +18,8 @@ def _bool(value: str | None, default: bool) -> bool:
 @dataclass(frozen=True)
 class Settings:
     db_path: str = "data/seatv.sqlite3"
+    # Cartella della cache dei loghi; vuota = "logos" accanto al database.
+    logo_dir: str = ""
     # Fonti da interrogare: "tivu", "sky", "xmltv". Se due fonti coprono lo
     # stesso canale, vince la prima.
     sources: tuple[str, ...] = ("tivu", "sky")
@@ -43,6 +45,7 @@ class Settings:
         )
         return cls(
             db_path=env.get("SEATV_DB_PATH", cls.db_path),
+            logo_dir=env.get("SEATV_LOGO_DIR", cls.logo_dir),
             sources=sources,
             xmltv_url=env.get("SEATV_XMLTV_URL") or None,
             tivu_url=env.get("SEATV_TIVU_URL") or cls.tivu_url,

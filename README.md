@@ -27,12 +27,12 @@ uvicorn seatv.main:create_app --factory
 
 ## Guida TV web
 
-Aprendo http://localhost:8000/ si vede una guida TV interattiva: una riga per canale, gli orari in orizzontale e una linea rossa sull'ora attuale.
+Aprendo http://localhost:8000/ si vede una guida TV interattiva con i colori del logo: in cima le schede di ciò che è in onda ora, sotto la griglia con una riga per canale, gli orari in orizzontale e una linea azzurra sull'ora attuale. Da telefono la colonna dei canali mostra solo il logo con il numero.
 
 - In alto si sceglie il giorno; il pulsante **Adesso** riporta all'ora attuale.
 - Le schede filtrano per piattaforma (digitale terrestre, Tivùsat, Sky) e mostrano i numeri di quella piattaforma.
 - Il menu **Fonte** mostra solo i canali di una fonte; il pulsante **Fonti** apre lo stato dell'ultimo aggiornamento di ciascuna.
-- Cliccando un programma si aprono orari, durata, genere, descrizione, immagine e fonte da cui arriva.
+- Cliccando un programma si aprono orari, durata, genere, descrizione, immagine e fonte da cui arriva (da telefono come pannello dal basso).
 
 La pagina è fatta di file statici (`seatv/static/`) che leggono `GET /guide` e `GET /health`.
 
@@ -42,11 +42,14 @@ La pagina è fatta di file statici (`seatv/static/`) che leggono `GET /guide` e 
 |---|---|
 | `GET /channels?platform=dtt\|tivusat\|sky` | Elenco canali. Con `platform`, solo quelli numerati su quella piattaforma, ordinati per numero (LCN). |
 | `GET /channels/{id}` | Un canale, es. `/channels/rai1`. |
+| `GET /channels/{id}/logo` | Logo del canale (Tivù o Sky), scaricato una volta e poi servito dalla cache locale. Solo immagini PNG, JPEG, GIF e WebP. |
 | `GET /channels/{id}/schedule?date=AAAA-MM-GG` | Palinsesto del giorno (ora italiana, default oggi): i programmi che iniziano in quel giorno. |
 | `GET /guide?date=AAAA-MM-GG&platform=...` | Tutti i canali con i programmi in onda nel giorno, anche solo in parte: i dati della griglia. |
 | `GET /channels/{id}/now?at=...` | Programma in onda e successivo su un canale. |
 | `GET /now?platform=dtt\|tivusat\|sky&at=...` | In onda ora e a seguire su tutti i canali. `at` è facoltativo; senza fuso orario si intende ora italiana. |
 | `GET /health` | Esito dell'ultima ingestione per ogni fonte; `degraded` se una fonte è fallita o non è ancora stata letta. |
+
+La documentazione interattiva è su `/docs`, con i colori e il logo di SEA-TV; lo schema OpenAPI è su `/openapi.json`.
 
 Esempio di canale:
 
@@ -81,6 +84,7 @@ Tutto tramite variabili d'ambiente:
 | Variabile | Default | Significato |
 |---|---|---|
 | `SEATV_DB_PATH` | `data/seatv.sqlite3` | File SQLite |
+| `SEATV_LOGO_DIR` | `logos/` accanto al database | Cartella della cache dei loghi |
 | `SEATV_SOURCES` | `tivu,sky` | Fonti separate da virgola, in ordine di priorità: `tivu`, `sky`, `xmltv` |
 | `SEATV_TIVU_URL` | `https://services.tivulaguida.it` | Indirizzo dell'API Tivù, se il servizio si sposta |
 | `SEATV_XMLTV_URL` | | URL del feed XMLTV (necessario con `xmltv`) |

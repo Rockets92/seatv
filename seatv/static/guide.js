@@ -143,8 +143,8 @@ function renderSources() {
     panel.append(
       el("article", { class: "source-card", style: sourceVar(run.source) },
         el("h3", {}, el("span", { class: "dot " + (run.error ? "err" : "ok") }), SOURCE_LABELS[run.source] || run.source),
-        el("p", {}, `Ultimo aggiornamento: ${when}`),
-        el("p", {}, `${run.channels} canali · ${run.programmes} programmi`),
+        el("p", {}, "Ultimo aggiornamento: ", el("strong", {}, when)),
+        el("p", {}, el("strong", {}, String(run.channels)), " canali · ", el("strong", {}, String(run.programmes)), " programmi"),
         run.error ? el("p", { class: "error" }, run.error) : null
       )
     );
@@ -155,7 +155,7 @@ function renderSources() {
   for (const row of state.guide?.channels || []) row.channel.sources.forEach((s) => names.add(s));
   const select = $("source-filter");
   const current = state.source;
-  select.replaceChildren(el("option", { value: "" }, "Tutte"));
+  select.replaceChildren(el("option", { value: "" }, "Tutte le fonti"));
   for (const name of [...names].sort()) {
     select.append(el("option", { value: name }, SOURCE_LABELS[name] || name));
   }
@@ -164,7 +164,7 @@ function renderSources() {
 }
 
 function renderStatus(message, hint) {
-  const box = el("div", { class: "status", id: "status" }, message);
+  const box = el("div", { class: "status", id: "status" }, el("img", { src: "/static/icon-192.png", alt: "" }), message);
   if (hint) box.append(el("br"), hint);
   $("guide").replaceChildren(box);
 }
@@ -186,6 +186,7 @@ function channelNumber(channel) {
 
 function renderGuide() {
   if (!state.guide) return;
+  renderOnAir();
   if (!state.guide.channels.length) {
     const hint = el("span", {}, "Avvia lo scaricamento con ", el("code", {}, "python -m seatv.ingest"), " e ricarica la pagina.");
     renderStatus("Nessun canale nel database.", hint);
@@ -208,22 +209,14 @@ function renderGuide() {
       el("div", { class: "tick" + (label.endsWith(":00") ? " hour" : ""), style: { left: `${x(t)}px` } }, label)
     );
   }
-  grid.append(el("div", { class: "timeline" }, el("div", { class: "corner" }, fmtDayLong.format(utcDate(state.date))), ticks));
+  grid.append(el("div", { class: "timeline" }, el("div", { class: "corner" }, capitalize(fmtDayLong.format(utcDate(state.date)))), ticks));
 
   const now = Date.now();
   for (const { channel, programmes } of rows) {
     const number = channelNumber(channel);
-    const logo = el("div", { class: "chan-logo" });
-    if (channel.logo) {
-      const img = el("img", { src: channel.logo, alt: "", loading: "lazy" });
-      img.addEventListener("error", () => logo.replaceChildren(initials(channel.name)));
-      logo.append(img);
-    } else {
-      logo.append(initials(channel.name));
-    }
     const chan = el("div", { class: "chan", title: channel.name },
       el("span", { class: "chan-num" }, number ?? ""),
-      logo,
+      logoTile(channel),
       el("div", { class: "chan-text" },
         el("div", { class: "chan-name" }, channel.name),
         el("div", { class: "chan-src" }, ...channel.sources.map((s) => el("i", { title: SOURCE_LABELS[s] || s, style: sourceVar(s) })))
@@ -238,7 +231,10 @@ function renderGuide() {
   }
 
   if (now >= state.dayStart && now < state.dayEnd) {
-    grid.append(el("div", { class: "now-line", id: "now-line", style: { left: `calc(var(--chan-w) + ${x(now)}px)` } }));
+    grid.append(
+      el("div", { class: "now-line", id: "now-line", style: { left: `calc(var(--chan-w) + ${x(now)}px)` } },
+        el("span", {}, fmtTime.format(now)))
+    );
   }
 
   const container = $("guide");
@@ -283,8 +279,61 @@ function x(time) {
   return ((Math.max(time, state.dayStart) - state.dayStart) / MIN) * PX_PER_MIN;
 }
 
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function initials(name) {
   return name.split(/\s+/).map((w) => w[0]).join("").slice(0, 3).toUpperCase();
+}
+
+// Riquadro col logo del canale, servito dalla cache di SEA-TV; se manca, le iniziali.
+function logoTile(channel) {
+  const tile = el("div", { class: "logo-tile", title: channel.name });
+  const fallback = () => {
+    tile.classList.add("initials");
+    tile.replaceChildren(initials(channel.name));
+  };
+  if (channel.logo) {
+    const img = el("img", { src: `/channels/${encodeURIComponent(channel.id)}/logo`, alt: channel.name, loading: "lazy", decoding: "async" });
+    img.addEventListener("error", fallback);
+    tile.append(img);
+  } else {
+    fallback();
+  }
+  return tile;
+}
+
+// Riga "In onda ora": una scheda per canale con il programma attuale e il successivo.
+function renderOnAir() {
+  const section = $("onair");
+  const now = Date.now();
+  if (state.date !== todayInRome()) {
+    section.hidden = true;
+    return;
+  }
+  const cards = [];
+  for (const { channel, programmes } of visibleRows()) {
+    const index = programmes.findIndex((p) => Date.parse(p.start) <= now && now < Date.parse(p.stop));
+    if (index < 0) continue;
+    const current = programmes[index];
+    const next = programmes[index + 1];
+    const start = Date.parse(current.start);
+    const stop = Date.parse(current.stop);
+    const number = channelNumber(channel);
+    cards.push(
+      el("button", { type: "button", class: "onair-card", onclick: () => openDetail(channel, current) },
+        logoTile(channel),
+        el("span", { class: "oc-title" }, current.title),
+        el("span", { class: "oc-sub" }, `${number != null ? number + " · " : ""}${channel.name} · fino alle ${fmtTime.format(stop)}`),
+        el("span", { class: "oc-bar" }, el("span", { style: { width: `${((now - start) / (stop - start)) * 100}%` } })),
+        el("span", { class: "oc-next" }, next ? `Dopo: ${fmtTime.format(Date.parse(next.start))} ${next.title}` : "")
+      )
+    );
+  }
+  section.hidden = !cards.length;
+  $("onair-list").replaceChildren(...cards);
+  $("clock").textContent = fmtTime.format(now);
 }
 
 function programmeBlock(channel, programme, now) {
@@ -305,7 +354,9 @@ function programmeBlock(channel, programme, now) {
     // Il testo resta visibile anche quando l'inizio del programma è fuori schermo.
     el("span", { class: "inner" },
       el("span", { class: "t" }, programme.title),
-      el("span", { class: "h" }, `${fmtTime.format(start)} – ${fmtTime.format(stop)}`)
+      el("span", { class: "h" },
+        `${fmtTime.format(start)} – ${fmtTime.format(stop)}`,
+        programme.category ? el("span", { class: "cat" }, ` · ${programme.category}`) : null)
     )
   );
   if (live) {
@@ -329,18 +380,19 @@ function openDetail(channel, programme) {
   const now = Date.now();
   const minutes = Math.round((stop - start) / MIN);
 
-  const image = $("detail-image");
-  image.className = "detail-image" + (programme.image ? "" : " empty");
-  image.style.backgroundImage = programme.image ? `url("${encodeURI(programme.image)}")` : "";
+  const hero = $("detail-hero");
+  hero.classList.toggle("noimg", !programme.image);
+  hero.style.backgroundImage = programme.image ? `url("${encodeURI(programme.image)}")` : "";
 
   const number = channelNumber(channel);
   $("detail-channel").replaceChildren(
-    number != null ? el("strong", {}, String(number)) : "",
-    channel.name
+    logoTile(channel),
+    number != null ? el("span", { class: "chan-num" }, String(number)) : "",
+    el("span", {}, channel.name)
   );
   $("detail-title").textContent = programme.title;
   const day = new Intl.DateTimeFormat("it-IT", { timeZone: TZ, weekday: "long", day: "numeric", month: "long" }).format(start);
-  $("detail-time").textContent = `${day}, ${fmtTime.format(start)} – ${fmtTime.format(stop)} · ${minutes} min`;
+  $("detail-time").textContent = `${capitalize(day)}, ${fmtTime.format(start)} – ${fmtTime.format(stop)} · ${minutes} min`;
 
   const progress = $("detail-progress");
   const live = start <= now && now < stop;
@@ -416,6 +468,13 @@ document.addEventListener("keydown", (event) => {
 setInterval(() => {
   if (state.guide && state.date === todayInRome()) renderGuide();
 }, 60 * 1000);
+
+// La griglia occupa lo schermo sotto la barra dei filtri, che su telefono va a capo.
+function syncToolbarHeight() {
+  document.documentElement.style.setProperty("--toolbar-h", `${document.querySelector(".toolbar").offsetHeight}px`);
+}
+window.addEventListener("resize", syncToolbarHeight);
+syncToolbarHeight();
 
 renderDays();
 loadGuide();

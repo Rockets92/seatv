@@ -37,9 +37,8 @@ def parse_channels(payload: dict) -> list[SourceChannel]:
             SourceChannel(
                 source_id=str(item["id"]),
                 name=item["name"].strip(),
-                # I loghi Sky sono percorsi relativi di cui non è noto l'host: si
-                # tiene quello di Tivù quando il canale c'è anche lì.
-                logo=None,
+                # Percorso relativo sullo stesso host delle immagini dei programmi.
+                logo=f"{SITE_URL}{item['logo']}" if item.get("logo") else None,
                 numbers={"sky": int(number)} if number else {},
             )
         )

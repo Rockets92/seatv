@@ -89,3 +89,42 @@ def test_web_page(api):
     assert api.get("/static/guide.css").status_code == 200
     assert api.get("/static/logo.png").headers["content-type"] == "image/png"
     assert api.get("/favicon.ico").status_code == 200
+
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
+
+
+def test_channel_logo_is_cached(settings, tivu_client):
+    import httpx
+    from fastapi.testclient import TestClient
+
+    from seatv.main import create_app
+
+    calls: list[str] = []
+
+    def logos(request: httpx.Request) -> httpx.Response:
+        calls.append(str(request.url))
+        if request.url.path.endswith("rai1hd.png"):
+            return httpx.Response(200, content=PNG)
+        return httpx.Response(200, content=b"<svg onload=alert(1)></svg>")
+
+    app = create_app(settings, http_client=httpx.AsyncClient(transport=httpx.MockTransport(logos)))
+    with TestClient(app) as client:
+        asyncio.run(run_ingest(settings, app.state.db, client=tivu_client, sources=[TivuSource()], now=NOW))
+        first = client.get("/channels/rai1/logo")
+        assert first.status_code == 200
+        assert first.headers["content-type"] == "image/png"
+        assert first.content == PNG
+        assert client.get("/channels/rai1/logo").content == PNG
+        assert calls == ["https://services.tivulaguida.it/uploads/channel/rai1hd.png"]
+        # Ciò che non è un'immagine raster (qui un SVG) non viene servito.
+        assert client.get("/channels/canale5/logo").status_code == 404
+        assert client.get("/channels/nope/logo").status_code == 404
+
+
+def test_docs_page_is_branded(api):
+    page = api.get("/docs")
+    assert page.status_code == 200
+    assert "/static/docs.css" in page.text
+    assert "/static/logo.png" in page.text
+    assert api.get("/static/docs.css").status_code == 200
