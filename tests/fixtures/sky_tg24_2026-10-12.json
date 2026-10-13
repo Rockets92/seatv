@@ -1,0 +1,31 @@
+{
+  "events": [
+    {
+      "channel": {"id": 9001, "name": "Sky TG24", "number": 100},
+      "content": {
+        "uuid": "00000000-0000-0000-0000-000000000001",
+        "contentTitle": "Buongiorno",
+        "genre": {"id": 4, "name": "Informazione"},
+        "subgenre": {"id": 40, "name": "News"},
+        "imagesMap": [
+          {"key": "background", "img": {"url": "/uuid/00000000-0000-0000-0000-000000000001/background"}},
+          {"key": "cover", "img": {"url": "/uuid/00000000-0000-0000-0000-000000000001/cover"}}
+        ]
+      },
+      "eventId": "1",
+      "starttime": "2026-10-12T04:00:00Z",
+      "endtime": "2026-10-12T06:00:00Z",
+      "eventTitle": "Buongiorno",
+      "eventSynopsis": "Le notizie del mattino."
+    },
+    {
+      "channel": {"id": 9001, "name": "Sky TG24", "number": 100},
+      "content": {"genre": {"id": 4, "name": "Informazione"}, "subgenre": {}, "imagesMap": []},
+      "eventId": "2",
+      "starttime": "2026-10-12T06:00:00Z",
+      "endtime": "2026-10-12T07:00:00Z",
+      "eventTitle": "Sky TG24 Mattina",
+      "eventSynopsis": ""
+    }
+  ]
+}

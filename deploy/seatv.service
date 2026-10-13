@@ -1,0 +1,16 @@
+# Servizio systemd per uvicorn dietro il proxy nginx di Plesk.
+# Sostituire UTENTE (utente di sistema dell'abbonamento Plesk) e i percorsi, poi:
+#   cp deploy/seatv.service /etc/systemd/system/ && systemctl enable --now seatv
+[Unit]
+Description=SEA-TV API
+After=network-online.target
+
+[Service]
+User=UTENTE
+WorkingDirectory=/var/www/vhosts/example.it/seatv
+EnvironmentFile=/var/www/vhosts/example.it/seatv/.env
+ExecStart=/var/www/vhosts/example.it/seatv/.venv/bin/uvicorn seatv.main:create_app --factory --host 127.0.0.1 --port 8000 --proxy-headers
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

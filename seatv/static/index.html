@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SEA-TV Guida TV</title>
+<meta name="description" content="Guida TV dei canali italiani del digitale terrestre e del satellite.">
+<link rel="icon" href="/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="/static/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<meta name="theme-color" content="#020817">
+<link rel="stylesheet" href="/static/guide.css">
+</head>
+<body>
+<div class="aurora" aria-hidden="true"></div>
+
+<header class="hero">
+  <div class="hero-bar">
+    <a class="brand" href="/" aria-label="SEA-TV, home">
+      <img src="/static/logo.png" alt="SEA-TV, Simple EPG API" width="960" height="316">
+    </a>
+    <div class="hero-actions">
+      <a class="pill" href="/docs">API</a>
+      <button type="button" id="sources-toggle" class="pill" aria-expanded="false" aria-controls="sources-panel">
+        <span class="dot" id="sources-dot"></span> Fonti
+      </button>
+    </div>
+  </div>
+
+  <nav class="days" aria-label="Giorno">
+    <button type="button" id="prev-day" class="round-btn" aria-label="Giorno precedente">‹</button>
+    <div class="day-list" id="day-list"></div>
+    <button type="button" id="next-day" class="round-btn" aria-label="Giorno successivo">›</button>
+  </nav>
+
+  <svg class="wave" viewBox="0 0 1440 120" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="wave-a" x1="0" x2="1">
+        <stop offset="0" stop-color="#0a6efe" stop-opacity="0"/>
+        <stop offset=".35" stop-color="#0a6efe"/>
+        <stop offset=".8" stop-color="#00c2ff"/>
+        <stop offset="1" stop-color="#00c2ff" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="wave-b" x1="0" x2="1">
+        <stop offset="0" stop-color="#00c2ff" stop-opacity="0"/>
+        <stop offset=".5" stop-color="#00c2ff" stop-opacity=".7"/>
+        <stop offset="1" stop-color="#0a6efe" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <path class="wave-glow" d="M0 86 C 240 30, 420 120, 720 70 S 1200 20, 1440 64" stroke="url(#wave-a)"/>
+    <path class="wave-line" d="M0 86 C 240 30, 420 120, 720 70 S 1200 20, 1440 64" stroke="url(#wave-a)"/>
+    <path class="wave-line thin" d="M0 100 C 300 60, 520 118, 820 86 S 1260 50, 1440 84" stroke="url(#wave-b)"/>
+  </svg>
+</header>
+
+<section id="sources-panel" class="sources-panel" hidden aria-label="Stato delle fonti"></section>
+
+<section class="onair" id="onair" aria-labelledby="onair-title" hidden>
+  <div class="section-head">
+    <h2 id="onair-title"><span class="live-dot" aria-hidden="true"></span>In onda ora</h2>
+    <span class="clock" id="clock"></span>
+  </div>
+  <div class="onair-list" id="onair-list"></div>
+</section>
+
+<div class="toolbar">
+  <div class="tabs" role="tablist" aria-label="Piattaforma" id="platform-tabs">
+    <button type="button" role="tab" data-platform="" aria-selected="true">Tutti</button>
+    <button type="button" role="tab" data-platform="dtt" aria-selected="false">Digitale terrestre</button>
+    <button type="button" role="tab" data-platform="tivusat" aria-selected="false">Tivùsat</button>
+    <button type="button" role="tab" data-platform="sky" aria-selected="false">Sky</button>
+  </div>
+  <div class="filters">
+    <label class="field select">
+      <span class="sr-only">Fonte</span>
+      <select id="source-filter" aria-label="Fonte"><option value="">Tutte le fonti</option></select>
+    </label>
+    <label class="field search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="search" placeholder="Cerca" aria-label="Cerca canale">
+    </label>
+    <button type="button" id="jump-now" class="now-btn">Adesso</button>
+  </div>
+</div>
+
+<main id="guide" class="guide" aria-live="polite">
+  <div class="status" id="status">Caricamento della guida…</div>
+</main>
+
+<aside id="detail" class="detail" hidden aria-labelledby="detail-title" role="dialog">
+  <div class="sheet-handle" aria-hidden="true"></div>
+  <button type="button" class="close" id="detail-close" aria-label="Chiudi">×</button>
+  <div class="detail-hero" id="detail-hero">
+    <div class="detail-channel" id="detail-channel"></div>
+  </div>
+  <div class="detail-body">
+    <h2 id="detail-title"></h2>
+    <p class="detail-time" id="detail-time"></p>
+    <div class="progress" id="detail-progress" hidden><span></span></div>
+    <div class="detail-meta" id="detail-meta"></div>
+    <p class="detail-desc" id="detail-desc"></p>
+  </div>
+</aside>
+<div class="backdrop" id="backdrop" hidden></div>
+
+<script src="/static/guide.js"></script>
+</body>
+</html>
