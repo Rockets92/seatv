@@ -17,7 +17,7 @@ BASE_URL = "https://services.tivulaguida.it"
 TIME_FORMAT = "%d-%m-%Y %H:%M"
 
 
-def parse_channels(payload: dict) -> list[SourceChannel]:
+def parse_channels(payload: dict, base_url: str = BASE_URL) -> list[SourceChannel]:
     channels = []
     for item in payload.get("channels") or []:
         numbers = {}
@@ -30,7 +30,7 @@ def parse_channels(payload: dict) -> list[SourceChannel]:
             SourceChannel(
                 source_id=str(item["id"]),
                 name=item["name"].strip(),
-                logo=f"{BASE_URL}/{icon}" if icon else None,
+                logo=f"{base_url}/{icon}" if icon else None,
                 numbers=numbers,
             )
         )
@@ -66,13 +66,14 @@ def parse_events(payload: dict, source_channel_id: str) -> list[SourceProgramme]
 class TivuSource:
     name = "tivu"
 
-    def __init__(self, concurrency: int = 4) -> None:
+    def __init__(self, concurrency: int = 4, base_url: str = BASE_URL) -> None:
         self.concurrency = concurrency
+        self.base_url = base_url.rstrip("/")
 
     async def fetch_channels(self, client: httpx.AsyncClient) -> list[SourceChannel]:
-        response = await client.get(f"{BASE_URL}/api/epg/channels.json")
+        response = await client.get(f"{self.base_url}/api/epg/channels.json")
         response.raise_for_status()
-        return parse_channels(response.json())
+        return parse_channels(response.json(), self.base_url)
 
     async def fetch_programmes(
         self,
@@ -81,7 +82,7 @@ class TivuSource:
         days: list[date],
     ) -> list[SourceProgramme]:
         async def fetch(channel: SourceChannel, day: date) -> list[SourceProgramme]:
-            url = f"{BASE_URL}/api/epg/channels/{channel.source_id}/date/{day.isoformat()}"
+            url = f"{self.base_url}/api/epg/channels/{channel.source_id}/date/{day.isoformat()}"
             response = await client.get(url)
             response.raise_for_status()
             return parse_events(response.json(), channel.source_id)

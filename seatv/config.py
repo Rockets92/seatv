@@ -22,6 +22,8 @@ class Settings:
     # stesso canale, vince la prima.
     sources: tuple[str, ...] = ("tivu", "sky")
     xmltv_url: str | None = None
+    # Indirizzo dell'API Tivù, da cambiare se il servizio si sposta.
+    tivu_url: str = "https://services.tivulaguida.it"
     # Giorni di palinsesto da scaricare a partire da oggi.
     days_ahead: int = 2
     # Giorni di palinsesto passato da conservare nel database.
@@ -43,6 +45,7 @@ class Settings:
             db_path=env.get("SEATV_DB_PATH", cls.db_path),
             sources=sources,
             xmltv_url=env.get("SEATV_XMLTV_URL") or None,
+            tivu_url=env.get("SEATV_TIVU_URL") or cls.tivu_url,
             days_ahead=int(env.get("SEATV_DAYS_AHEAD", cls.days_ahead)),
             retention_days=int(env.get("SEATV_RETENTION_DAYS", cls.retention_days)),
             refresh_hours=float(env.get("SEATV_REFRESH_HOURS", cls.refresh_hours)),

@@ -66,6 +66,8 @@ Le fonti sono intercambiabili (`seatv/sources/`): ognuna restituisce canali e pr
 
 I canali delle diverse fonti vengono uniti per nome normalizzato: "Rai 1" e "Rai 1 HD" di Tivù e "Rai 1 HD" di Sky diventano un solo canale con id `rai1` e i numeri di tutte le piattaforme. Per i nomi scritti in modo diverso c'è una piccola tabella di alias in `seatv/sources/__init__.py`. Se una piattaforma elenca più varianti dello stesso canale, si tiene il numero più basso.
 
+Se una fonte non risponde, le altre vanno avanti e `/health` riporta l'errore. Se manca Tivù, i palinsesti dei canali nazionali arrivano da Sky e i numeri del digitale terrestre vengono da una tabella di riserva (`seatv/lcn.py`).
+
 Se due fonti coprono lo stesso canale vince la prima di `SEATV_SOURCES`: nome, logo e palinsesto di Rai 1 arrivano da Tivù, e Sky viene interrogata solo per i canali che Tivù non ha fornito.
 
 A ogni aggiornamento, i programmi di un canale nell'intervallo coperto dai dati nuovi vengono sostituiti, così un programma spostato di orario non resta duplicato.
@@ -80,6 +82,7 @@ Tutto tramite variabili d'ambiente:
 |---|---|---|
 | `SEATV_DB_PATH` | `data/seatv.sqlite3` | File SQLite |
 | `SEATV_SOURCES` | `tivu,sky` | Fonti separate da virgola, in ordine di priorità: `tivu`, `sky`, `xmltv` |
+| `SEATV_TIVU_URL` | `https://services.tivulaguida.it` | Indirizzo dell'API Tivù, se il servizio si sposta |
 | `SEATV_XMLTV_URL` | | URL del feed XMLTV (necessario con `xmltv`) |
 | `SEATV_DAYS_AHEAD` | `2` | Giorni di palinsesto da scaricare, a partire da oggi |
 | `SEATV_RETENTION_DAYS` | `7` | Giorni di palinsesto passato da conservare |

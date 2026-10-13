@@ -120,6 +120,18 @@ class Database:
                 (channel_id, platform, lcn),
             )
 
+    def fill_missing_numbers(self, conn: sqlite3.Connection, platform: str, numbers: dict[str, int]) -> int:
+        """Assegna i numeri dati ai canali esistenti che su quella piattaforma non ne hanno."""
+        cursor = conn.executemany(
+            """
+            INSERT INTO channel_numbers (channel_id, platform, lcn)
+            SELECT id, ?, ? FROM channels WHERE id = ?
+            ON CONFLICT (channel_id, platform) DO NOTHING
+            """,
+            [(platform, lcn, channel_id) for channel_id, lcn in numbers.items()],
+        )
+        return cursor.rowcount
+
     def link_source(
         self, conn: sqlite3.Connection, source: str, source_channel_id: str, channel_id: str
     ) -> None:

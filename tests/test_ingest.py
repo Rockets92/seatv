@@ -94,3 +94,43 @@ async def test_tivu_and_sky_ingest(settings, db):
     assert "8005" in sky_event_channels
     assert results[1].programmes == 2
     assert db.on_air(NOW, ["skytg24"])["skytg24"]["now"]["title"] == "Buongiorno"
+
+
+@pytest.mark.anyio
+async def test_dtt_falls_back_to_sky_when_tivu_is_down(settings, db, caplog):
+    requests: list[httpx.Request] = []
+    sky = combined_handler(requests)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "services.tivulaguida.it":
+            raise httpx.ConnectError("[Errno 11001] getaddrinfo failed", request=request)
+        return sky(request)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    tivu, sky_result = await run_ingest(settings, db, client=client, sources=[TivuSource(), SkySource()], now=NOW)
+
+    assert tivu.error == "ConnectError: [Errno 11001] getaddrinfo failed"
+    # Una riga di log, senza traceback.
+    assert "ingestione tivu fallita: [Errno 11001] getaddrinfo failed (https://services.tivulaguida.it/api/epg/channels.json)" in caplog.text
+    assert "Traceback" not in caplog.text
+    assert sky_result.error is None
+
+    # Senza Tivù i canali nazionali prendono i numeri DTT di riserva...
+    assert db.get_channel("rai1")["numbers"] == {"sky": 101, "dtt": 1}
+    assert [c["id"] for c in db.list_channels("dtt")] == ["rai1", "canale5"]
+    # ...e il palinsesto lo chiede Sky.
+    assert "8001" in {r.url.params.get("channels") for r in requests if r.url.path == "/gtv/v1/events"}
+
+
+@pytest.mark.anyio
+async def test_tivu_base_url_is_configurable(settings, db):
+    seen: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.url.host)
+        return httpx.Response(200, json={"channels": [{"id": 42, "name": "Rai 1 HD", "icon": "x.png", "is_dtt": True, "channel_dtt": 1}]})
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    await run_ingest(settings, db, client=client, sources=[TivuSource(base_url="https://tivu.example.org/")], now=NOW)
+    assert set(seen) == {"tivu.example.org"}
+    assert db.get_channel("rai1")["logo"] == "https://tivu.example.org/x.png"

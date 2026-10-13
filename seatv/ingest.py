@@ -15,6 +15,7 @@ import httpx
 
 from seatv.config import ROME, Settings
 from seatv.db import Database
+from seatv.lcn import DTT_FALLBACK
 from seatv.sources import Source, SourceChannel, clean_name
 from seatv.sources.sky import SkySource
 from seatv.sources.tivu import TivuSource
@@ -35,7 +36,7 @@ def build_sources(settings: Settings) -> list[Source]:
     sources: list[Source] = []
     for name in settings.sources:
         if name == "tivu":
-            sources.append(TivuSource(concurrency=settings.http_concurrency))
+            sources.append(TivuSource(concurrency=settings.http_concurrency, base_url=settings.tivu_url))
         elif name == "sky":
             sources.append(SkySource(concurrency=settings.http_concurrency))
         elif name == "xmltv":
@@ -136,6 +137,14 @@ async def run_ingest(
             run_id = db.start_run(source.name, now)
             try:
                 result = await ingest_source(db, source, client, days, now, covered)
+            except httpx.HTTPError as exc:
+                # Rete o servizio non raggiungibile: basta una riga, senza traceback.
+                try:
+                    url = str(exc.request.url)
+                except RuntimeError:  # errore senza richiesta associata
+                    url = "?"
+                log.error("ingestione %s fallita: %s (%s)", source.name, exc, url)
+                result = IngestResult(source=source.name, error=f"{type(exc).__name__}: {exc}")
             except Exception as exc:  # una fonte rotta non deve fermare le altre
                 log.exception("ingestione %s fallita", source.name)
                 result = IngestResult(source=source.name, error=f"{type(exc).__name__}: {exc}")
@@ -147,6 +156,9 @@ async def run_ingest(
             await client.aclose()
 
     with db.connect() as conn:
+        filled = db.fill_missing_numbers(conn, "dtt", DTT_FALLBACK)
+        if filled:
+            log.info("numeri DTT di riserva assegnati a %d canali", filled)
         db.prune_programmes(conn, now - timedelta(days=settings.retention_days))
     return results
 
