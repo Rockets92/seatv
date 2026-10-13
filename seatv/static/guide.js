@@ -384,10 +384,8 @@ function openDetail(channel, programme) {
   hero.classList.toggle("noimg", !programme.image);
   hero.style.backgroundImage = programme.image ? `url("${encodeURI(programme.image)}")` : "";
 
-  const number = channelNumber(channel);
   $("detail-channel").replaceChildren(
     logoTile(channel),
-    number != null ? el("span", { class: "chan-num" }, String(number)) : "",
     el("span", {}, channel.name)
   );
   $("detail-title").textContent = programme.title;
