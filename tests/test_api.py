@@ -65,7 +65,7 @@ def test_health(loaded):
 
 
 def test_health_degraded_before_first_ingest(api):
-    assert api.get("/health").json() == {"status": "degraded", "sources": []}
+    assert api.get("/health").json() == {"status": "degraded", "sources": [], "days_ahead": 2}
 
 
 def test_guide(loaded):

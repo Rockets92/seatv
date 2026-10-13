@@ -17,6 +17,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+# Avvio sotto Phusion Passenger (passenger_wsgi.py).
+plesk = ["a2wsgi>=1.10"]
 
 [tool.setuptools.packages.find]
 include = ["seatv*"]

@@ -16,7 +16,14 @@ const state = {
   health: null,
   dayStart: 0,
   dayEnd: 0,
+  // Giorni scaricati da oggi in avanti; il valore vero arriva da /health.
+  daysAhead: 7,
 };
+
+// Chiave dell'API, se il server la richiede (SEATV_API_KEYS): chiesta una volta e ricordata nel browser.
+const KEY_STORAGE = "seatv-api-key";
+let apiKey = "";
+try { apiKey = localStorage.getItem(KEY_STORAGE) || ""; } catch {}
 
 const $ = (id) => document.getElementById(id);
 const fmtTime = new Intl.DateTimeFormat("it-IT", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
@@ -62,15 +69,20 @@ async function loadGuide() {
   if (state.platform) params.set("platform", state.platform);
   try {
     const [guide, health] = await Promise.all([
-      fetch(`/guide?${params}`).then(checked),
-      fetch("/health").then(checked),
+      apiGet(`/guide?${params}`),
+      apiGet("/health"),
     ]);
     state.guide = guide;
     state.health = health;
   } catch (err) {
     state.guide = null;
-    renderStatus(`Impossibile leggere la guida: ${err.message}`);
+    if (err.status === 401) renderKeyForm(Boolean(apiKey));
+    else renderStatus(`Impossibile leggere la guida: ${err.message}`);
     return;
+  }
+  if (state.health.days_ahead && state.health.days_ahead !== state.daysAhead) {
+    state.daysAhead = state.health.days_ahead;
+    renderDays();
   }
   state.dayStart = romeMidnight(state.date);
   state.dayEnd = romeMidnight(addDays(state.date, 1));
@@ -78,9 +90,30 @@ async function loadGuide() {
   renderGuide();
 }
 
-function checked(response) {
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+async function apiGet(url) {
+  const response = await fetch(url, { headers: apiKey ? { "X-API-Key": apiKey } : {} });
+  if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
   return response.json();
+}
+
+function renderKeyForm(wrong) {
+  const input = el("input", { type: "password", placeholder: "Chiave API", autocomplete: "current-password", required: "" });
+  const form = el(
+    "form",
+    {
+      class: "key-form",
+      onsubmit: (event) => {
+        event.preventDefault();
+        apiKey = input.value.trim();
+        try { localStorage.setItem(KEY_STORAGE, apiKey); } catch {}
+        loadGuide();
+      },
+    },
+    input,
+    el("button", { type: "submit" }, "Entra")
+  );
+  renderStatus(wrong ? "Chiave non valida, riprova." : "Questa guida è riservata: inserisci la chiave API.", form);
+  input.focus();
 }
 
 // --- disegno -----------------------------------------------------------
@@ -114,8 +147,11 @@ function renderDays() {
   const list = $("day-list");
   list.replaceChildren();
   const today = todayInRome();
-  // Da ieri l'altro a fra quattro giorni; le frecce vanno oltre.
-  for (let offset = -2; offset <= 4; offset++) {
+  const last = addDays(today, state.daysAhead - 1);
+  // Solo i giorni scaricati: da oggi in avanti.
+  $("prev-day").disabled = state.date <= today;
+  $("next-day").disabled = state.date >= last;
+  for (let offset = 0; offset < state.daysAhead; offset++) {
     const day = addDays(today, offset);
     const label = day === today ? "Oggi" : day === addDays(today, 1) ? "Domani" : day === addDays(today, -1) ? "Ieri" : fmtDayShort.format(utcDate(day));
     const button = el(
@@ -433,8 +469,12 @@ function setPlatform(platform) {
   loadGuide();
 }
 
-$("prev-day").addEventListener("click", () => setDate(addDays(state.date, -1)));
-$("next-day").addEventListener("click", () => setDate(addDays(state.date, 1)));
+$("prev-day").addEventListener("click", () => {
+  if (state.date > todayInRome()) setDate(addDays(state.date, -1));
+});
+$("next-day").addEventListener("click", () => {
+  if (state.date < addDays(todayInRome(), state.daysAhead - 1)) setDate(addDays(state.date, 1));
+});
 $("platform-tabs").addEventListener("click", (event) => {
   const tab = event.target.closest("button[data-platform]");
   if (tab) setPlatform(tab.dataset.platform);

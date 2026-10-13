@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from datetime import time
 from zoneinfo import ZoneInfo
 
 ROME = ZoneInfo("Europe/Rome")
@@ -28,11 +29,17 @@ class Settings:
     tivu_url: str = "https://services.tivulaguida.it"
     # Elenco pubblico di loghi di riserva (iptv-org); vuoto = non usarlo.
     logo_index_url: str = "https://raw.githubusercontent.com/iptv-org/database/master/data/logos.csv"
-    # Giorni di palinsesto da scaricare a partire da oggi.
-    days_ahead: int = 2
+    # Giorni di palinsesto da scaricare a partire da oggi (oggi compreso):
+    # sono anche i giorni che la pagina web lascia scegliere.
+    days_ahead: int = 7
     # Giorni di palinsesto passato da conservare nel database.
     retention_days: int = 7
     refresh_hours: float = 12.0
+    # Ora italiana dell'aggiornamento quotidiano, es. 05:00; se impostata
+    # sostituisce refresh_hours.
+    refresh_at: time | None = None
+    # Chiavi che danno accesso ai dati; vuoto = API aperta a tutti.
+    api_keys: tuple[str, ...] = ()
     scheduler_enabled: bool = True
     http_timeout: float = 20.0
     http_concurrency: int = 4
@@ -55,6 +62,8 @@ class Settings:
             days_ahead=int(env.get("SEATV_DAYS_AHEAD", cls.days_ahead)),
             retention_days=int(env.get("SEATV_RETENTION_DAYS", cls.retention_days)),
             refresh_hours=float(env.get("SEATV_REFRESH_HOURS", cls.refresh_hours)),
+            refresh_at=time.fromisoformat(env["SEATV_REFRESH_AT"]) if env.get("SEATV_REFRESH_AT") else None,
+            api_keys=tuple(k.strip() for k in env.get("SEATV_API_KEYS", "").split(",") if k.strip()),
             scheduler_enabled=_bool(env.get("SEATV_SCHEDULER"), cls.scheduler_enabled),
             http_timeout=float(env.get("SEATV_HTTP_TIMEOUT", cls.http_timeout)),
             http_concurrency=int(env.get("SEATV_HTTP_CONCURRENCY", cls.http_concurrency)),

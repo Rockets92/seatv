@@ -25,16 +25,20 @@ python -m seatv.ingest
 uvicorn seatv.main:create_app --factory
 ```
 
+## Installazione su un server
+
+Per metterlo su Plesk, con aggiornamento quotidiano a un'ora fissa e API protetta da chiave, segui [docs/plesk.md](docs/plesk.md).
+
 ## Guida TV web
 
 Aprendo http://localhost:8000/ si vede una guida TV interattiva con i colori del logo: in cima le schede di ciò che è in onda ora, sotto la griglia con una riga per canale, gli orari in orizzontale e una linea azzurra sull'ora attuale. Da telefono la colonna dei canali mostra solo il logo con il numero.
 
-- In alto si sceglie il giorno; il pulsante **Adesso** riporta all'ora attuale.
+- In alto si sceglie il giorno, da oggi ai giorni scaricati (`SEATV_DAYS_AHEAD`, 7 di default); il pulsante **Adesso** riporta all'ora attuale.
 - Le schede filtrano per piattaforma (digitale terrestre, Tivùsat, Sky) e mostrano i numeri di quella piattaforma.
 - Il menu **Fonte** mostra solo i canali di una fonte; il pulsante **Fonti** apre lo stato dell'ultimo aggiornamento di ciascuna.
 - Cliccando un programma si aprono orari, durata, genere, descrizione, immagine e fonte da cui arriva (da telefono come pannello dal basso).
 
-La pagina è fatta di file statici (`seatv/static/`) che leggono `GET /guide` e `GET /health`.
+La pagina è fatta di file statici (`seatv/static/`) che leggono `GET /guide` e `GET /health`. Se l'API richiede una chiave, la pagina la chiede la prima volta e la ricorda nel browser.
 
 ## Endpoint
 
@@ -48,6 +52,8 @@ La pagina è fatta di file statici (`seatv/static/`) che leggono `GET /guide` e 
 | `GET /channels/{id}/now?at=...` | Programma in onda e successivo su un canale. |
 | `GET /now?platform=dtt\|tivusat\|sky&at=...` | In onda ora e a seguire su tutti i canali. `at` è facoltativo; senza fuso orario si intende ora italiana. |
 | `GET /health` | Esito dell'ultima ingestione per ogni fonte; `degraded` se una fonte è fallita o non è ancora stata letta. |
+
+Con `SEATV_API_KEYS` impostata, tutti gli endpoint tranne il logo richiedono la chiave nell'header `X-API-Key` o nel parametro `?api_key=`; senza chiave rispondono 401. La pagina web, `/docs` e `/openapi.json` restano aperti.
 
 La documentazione interattiva è su `/docs`, con i colori e il logo di SEA-TV; lo schema OpenAPI è su `/openapi.json`.
 
@@ -89,9 +95,11 @@ Tutto tramite variabili d'ambiente:
 | `SEATV_SOURCES` | `tivu,sky` | Fonti separate da virgola, in ordine di priorità: `tivu`, `sky`, `xmltv` |
 | `SEATV_TIVU_URL` | `https://services.tivulaguida.it` | Indirizzo dell'API Tivù, se il servizio si sposta |
 | `SEATV_XMLTV_URL` | | URL del feed XMLTV (necessario con `xmltv`) |
-| `SEATV_DAYS_AHEAD` | `2` | Giorni di palinsesto da scaricare, a partire da oggi |
+| `SEATV_DAYS_AHEAD` | `7` | Giorni di palinsesto da scaricare, a partire da oggi; sono anche i giorni scelti nella pagina web |
 | `SEATV_RETENTION_DAYS` | `7` | Giorni di palinsesto passato da conservare |
 | `SEATV_REFRESH_HOURS` | `12` | Ogni quante ore aggiornare |
+| `SEATV_REFRESH_AT` | | Ora italiana dell'aggiornamento quotidiano, es. `05:00`; se impostata sostituisce `SEATV_REFRESH_HOURS` |
+| `SEATV_API_KEYS` | | Chiavi di accesso all'API separate da virgola; vuota = API aperta |
 | `SEATV_SCHEDULER` | `true` | `false` per disattivare l'aggiornamento automatico nel server (es. se si usa cron con `python -m seatv.ingest`) |
 | `SEATV_HTTP_TIMEOUT` | `20` | Timeout delle richieste in secondi |
 | `SEATV_HTTP_CONCURRENCY` | `4` | Richieste contemporanee verso ciascuna fonte |
@@ -107,6 +115,9 @@ I test non usano la rete: le risposte delle fonti sono simulate con i file in `t
 ## Struttura
 
 ```
+passenger_wsgi.py  avvio sotto Phusion Passenger (Plesk)
+deploy/            script di aggiornamento, servizio systemd ed esempio di .env
+docs/plesk.md      installazione su Plesk
 seatv/
   config.py        configurazione da variabili d'ambiente
   db.py            schema SQLite e query
