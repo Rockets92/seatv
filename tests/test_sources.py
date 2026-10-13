@@ -81,10 +81,15 @@ SkyUno.it,,TRUE,,960,274,SVG,https://upload.wikimedia.org/skyuno.svg
 SkyCinemaDue.it,Plus24,TRUE,,960,120,PNG,https://upload.wikimedia.org/due24.png
 DAZN3.uk,,TRUE,,512,249,PNG,https://i.imgur.com/dazn3.png
 Rai1.it,,FALSE,,1,1,PNG,https://example.org/old.png
+SportTV.by,,TRUE,,1,1,PNG,https://example.org/sporttv-by.png
+SportTV.jo,,TRUE,,1,1,PNG,https://example.org/sporttv-jo.png
+SkyUno.uk,,TRUE,,1,1,PNG,https://example.org/skyone.png
 """
     assert parse(text) == {
         "skyuno": ["https://upload.wikimedia.org/skyuno.png"],
         "skycinemadueplus24": ["https://upload.wikimedia.org/due24.png"],
+        # Nome presente in un solo paese: va bene come riserva.
+        "dazn3": ["https://i.imgur.com/dazn3.png"],
     }
 
 

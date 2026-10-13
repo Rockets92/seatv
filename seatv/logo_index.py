@@ -24,14 +24,20 @@ FEEDS = {"": "", "HD": "", "SD": "", "Plus1": " +1", "Plus24": " +24"}
 
 
 def parse(text: str) -> dict[str, list[str]]:
-    """Indirizzi dei loghi dei canali italiani per id SEA-TV (`skyuno`, `skyunoplus1`)."""
-    logos: dict[str, list[str]] = {}
+    """Indirizzi dei loghi per id SEA-TV (`skyuno`, `skyunoplus1`).
+
+    Si usano i canali italiani; un canale che manca tra gli italiani prende
+    il logo di un altro paese solo se il nome esiste in un paese soltanto
+    (es. `DAZN3.uk`, stesso marchio), così "Sport TV" non prende il logo di
+    un omonimo straniero."""
+    italian: dict[str, list[str]] = {}
+    foreign: dict[str, dict[str, list[str]]] = {}
     for row in csv.DictReader(io.StringIO(text)):
         name, _, country = (row.get("channel") or "").rpartition(".")
         feed = row.get("feed") or ""
         url = row.get("url") or ""
         if (
-            country != "it"
+            not name
             or feed not in FEEDS
             or (row.get("format") or "").upper() not in FORMATS
             or (row.get("in_use") or "").upper() != "TRUE"
@@ -39,9 +45,15 @@ def parse(text: str) -> dict[str, list[str]]:
         ):
             continue
         slug = channel_slug(name + FEEDS[feed])
-        if slug and url not in logos.setdefault(slug, []):
-            logos[slug].append(url)
-    return logos
+        if not slug:
+            continue
+        urls = italian.setdefault(slug, []) if country == "it" else foreign.setdefault(slug, {}).setdefault(country, [])
+        if url not in urls:
+            urls.append(url)
+    for slug, countries in foreign.items():
+        if slug not in italian and len(countries) == 1:
+            italian[slug] = next(iter(countries.values()))
+    return italian
 
 
 async def fetch(client: httpx.AsyncClient, url: str = URL) -> dict[str, list[str]]:
