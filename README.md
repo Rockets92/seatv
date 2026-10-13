@@ -1,3 +1,5 @@
+<p align="center"><img src="seatv/static/logo.png" alt="SEA-TV, Simple EPG API" width="520"></p>
+
 # SEA-TV API
 
 API web con la guida TV (EPG) dei canali italiani del digitale terrestre e del satellite.

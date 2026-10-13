@@ -247,7 +247,37 @@ function renderGuide() {
   container.dataset.date = state.date;
   if (keepScroll !== null) container.scrollLeft = keepScroll;
   else scrollToNow(false);
+  pinTitles();
 }
+
+// Se un programma inizia prima del bordo sinistro visibile, sposta il suo
+// testo a destra così il titolo resta leggibile.
+let pinned = [];
+function pinTitles() {
+  for (const inner of pinned) inner.style.transform = inner.style.width = "";
+  pinned = [];
+  const edge = $("guide").scrollLeft;
+  for (const track of document.querySelectorAll(".track")) {
+    for (const block of track.children) {
+      const left = block.offsetLeft;
+      const right = left + block.offsetWidth;
+      if (left >= edge) break;
+      if (right <= edge + 40) continue;
+      const inner = block.firstElementChild;
+      const shift = edge - left;
+      inner.style.transform = `translateX(${shift}px)`;
+      inner.style.width = `calc(100% - ${shift}px)`;
+      pinned.push(inner);
+      break;
+    }
+  }
+}
+
+let pinFrame = 0;
+$("guide").addEventListener("scroll", () => {
+  cancelAnimationFrame(pinFrame);
+  pinFrame = requestAnimationFrame(pinTitles);
+}, { passive: true });
 
 function x(time) {
   return ((Math.max(time, state.dayStart) - state.dayStart) / MIN) * PX_PER_MIN;

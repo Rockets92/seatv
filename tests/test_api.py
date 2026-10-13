@@ -87,3 +87,5 @@ def test_web_page(api):
     assert "SEA-TV" in page.text
     assert api.get("/static/guide.js").status_code == 200
     assert api.get("/static/guide.css").status_code == 200
+    assert api.get("/static/logo.png").headers["content-type"] == "image/png"
+    assert api.get("/favicon.ico").status_code == 200
