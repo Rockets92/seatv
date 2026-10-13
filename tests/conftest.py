@@ -6,11 +6,8 @@ from pathlib import Path
 
 import httpx
 import pytest
-from fastapi.testclient import TestClient
 
 from seatv.config import Settings
-from seatv.db import Database
-from seatv.main import create_app
 
 FIXTURES = Path(__file__).parent / "fixtures"
 # 07:00 ora italiana del 12 ottobre 2026.
@@ -52,23 +49,17 @@ def combined_handler(requests: list[httpx.Request]):
 
 @pytest.fixture
 def settings(tmp_path) -> Settings:
-    return Settings(db_path=str(tmp_path / "test.sqlite3"), scheduler_enabled=False, days_ahead=2, logo_index_url="")
-
-
-@pytest.fixture
-def db(settings) -> Database:
-    return Database(settings.db_path)
+    return Settings(
+        days_ahead=2,
+        logo_index_url="",
+        out_dir=str(tmp_path / "dist"),
+        cache_dir=str(tmp_path / "cache"),
+    )
 
 
 @pytest.fixture
 def tivu_client():
     return httpx.AsyncClient(transport=httpx.MockTransport(tivu_handler))
-
-
-@pytest.fixture
-def api(settings):
-    with TestClient(create_app(settings)) as client:
-        yield client
 
 
 @pytest.fixture

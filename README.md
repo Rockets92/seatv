@@ -1,108 +1,122 @@
-<p align="center"><img src="seatv/static/logo.png" alt="SEA-TV, Simple EPG API" width="520"></p>
+<p align="center"><img src="seatv/web/logo.png" alt="SEA-TV, Simple EPG API" width="520"></p>
 
-# SEA-TV API
+# SEA-TV
 
-API web con la guida TV (EPG) dei canali italiani del digitale terrestre e del satellite.
+Guida TV (EPG) dei canali italiani del digitale terrestre e del satellite, pubblicata come sito statico su **Cloudflare Pages** (piano gratuito) e aggiornata ogni mattina da **GitHub Actions**.
 
-Le piattaforme, ognuna con la sua numerazione, sono:
+Ogni aggiornamento produce:
 
-- `dtt`: digitale terrestre
-- `tivusat`: satellite gratuito Tivùsat
-- `sky`: satellite Sky Italia
+- un **feed XMLTV** (`epg.xml` e `epg.xml.gz`) da incollare nel programma IPTV come EPG esterna;
+- la **guida TV web** con loghi, griglia per canale e dettaglio dei programmi;
+- un'**API JSON** fatta di file statici (canali, griglia per giorno, palinsesto per canale, stato delle fonti).
 
-Il servizio scarica periodicamente i palinsesti da una o più fonti, li salva in SQLite e li espone in JSON con FastAPI.
+Le piattaforme, ognuna con la sua numerazione, sono `dtt` (digitale terrestre), `tivusat` (satellite gratuito Tivùsat) e `sky` (satellite Sky Italia).
 
-## Avvio rapido
+## Come funziona
 
-```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-
-# Scarica subito i palinsesti (facoltativo: il server lo fa anche all'avvio)
-python -m seatv.ingest
-
-# Avvia su http://localhost:8000: guida TV su /, documentazione dell'API su /docs
-uvicorn seatv.main:create_app --factory
+```
+GitHub Actions, ogni giorno alle 05:00 ora italiana
+  └─ python -m seatv.build
+       ├─ scarica canali e palinsesti da Tivù e Sky (7 giorni)
+       ├─ scarica i loghi (tenuti in cache tra un giorno e l'altro)
+       └─ scrive dist/: feed XMLTV, API JSON, pagina web
+  └─ wrangler pages deploy dist  →  https://<progetto>.pages.dev/<token>/
 ```
 
-## Installazione su un server
+Perché così e non un Worker con Cron Trigger: un aggiornamento fa circa 1.500 richieste alle fonti (circa 230 canali per 7 giorni), mentre un Worker gratuito può farne al massimo 50 per esecuzione; le fonti poi rispondono a client "normali" e un runner di GitHub lo è più di un Worker. Cloudflare serve solo file statici, senza limiti di richieste sul piano gratuito.
 
-Per metterlo su Plesk, con aggiornamento quotidiano a un'ora fissa e API protetta da chiave, segui [docs/plesk.md](docs/plesk.md).
+**Riservatezza.** Il sito sta in una cartella dal nome segreto (`SEATV_FEED_TOKEN`): chi non conosce l'indirizzo trova solo una pagina vuota. Tutte le risposte hanno `X-Robots-Tag: noindex`, `robots.txt` blocca i motori di ricerca e la pagina non invia il proprio indirizzo ad altri siti (`Referrer-Policy: no-referrer`). Il token nel percorso funziona con qualsiasi programma IPTV, perché è un normale URL.
 
-Con Docker basta `docker compose up -d --build` (impostazioni in `.env`, vedi `deploy/env.example`): il container scarica la guida all'avvio e ogni giorno alle 05:00, e tiene il database nel volume `/data`.
+**Attenzione ai diritti:** nessuna delle fonti concede in licenza i dati. Va bene per un uso personale e di prova; per un servizio pubblico serve un accordo con gli editori o un fornitore licenziato.
 
-## Guida TV web
+## Pubblicazione su Cloudflare
 
-Aprendo http://localhost:8000/ si vede una guida TV interattiva con i colori del logo: in cima le schede di ciò che è in onda ora, sotto la griglia con una riga per canale, gli orari in orizzontale e una linea azzurra sull'ora attuale. Da telefono la colonna dei canali mostra solo il logo con il numero.
+La guida passo passo, con i segreti da aggiungere su GitHub, è in [docs/cloudflare.md](docs/cloudflare.md).
 
-- In alto si sceglie il giorno, da oggi ai giorni scaricati (`SEATV_DAYS_AHEAD`, 7 di default); il pulsante **Adesso** riporta all'ora attuale.
-- Le schede filtrano per piattaforma (digitale terrestre, Tivùsat, Sky) e mostrano i numeri di quella piattaforma.
-- Il menu **Fonte** mostra solo i canali di una fonte; il pulsante **Fonti** apre lo stato dell'ultimo aggiornamento di ciascuna.
-- Cliccando un programma si aprono orari, durata, genere, descrizione, immagine e fonte da cui arriva (da telefono come pannello dal basso).
+## Uso nel programma IPTV
 
-La pagina è fatta di file statici (`seatv/static/`) che leggono `GET /guide` e `GET /health`. Se l'API richiede una chiave, la pagina la chiede la prima volta e la ricorda nel browser.
+Nel programma IPTV (TiviMate, IPTV Smarters, Kodi IPTV Simple, Jellyfin, Plex, OTT Navigator...) aggiungi come EPG esterna:
 
-## Endpoint
+```
+https://<progetto>.pages.dev/<token>/epg.xml.gz
+```
 
-| Metodo e percorso | Cosa restituisce |
+Se il programma non legge i file compressi usa `epg.xml`. L'indirizzo esatto, con il pulsante per copiarlo, è anche nella guida web sotto **Feed e fonti**.
+
+Per abbinare i canali della playlist M3U alla guida, usa come `tvg-id` l'id del canale SEA-TV:
+
+```
+#EXTINF:-1 tvg-id="rai1" tvg-chno="1",Rai 1
+```
+
+Gli id sono il nome in minuscolo senza spazi e senza "HD" (`rai1`, `canale5`, `skytg24`; il `+` diventa `plus`, quindi `skyunoplus1`). L'elenco completo è in `api/channels.json` e ogni programma nella guida web mostra il suo `tvg-id`. Per i programmi che abbinano per nome, ogni canale del feed elenca anche i nomi usati dalle fonti (es. "Rai 1" e "Rai 1 HD").
+
+Gli orari del feed sono in ora italiana con offset (`20261013210000 +0200`), quindi il cambio dell'ora legale è gestito.
+
+## API JSON
+
+Tutti i percorsi sono relativi a `https://<progetto>.pages.dev/<token>/`:
+
+| Percorso | Contenuto |
 |---|---|
-| `GET /channels?platform=dtt\|tivusat\|sky` | Elenco canali. Con `platform`, solo quelli numerati su quella piattaforma, ordinati per numero (LCN). |
-| `GET /channels/{id}` | Un canale, es. `/channels/rai1`. |
-| `GET /channels/{id}/logo` | Logo del canale (Tivù o Sky), scaricato una volta e poi servito dalla cache locale. Solo immagini PNG, JPEG, GIF e WebP. Se un indirizzo non funziona si provano le altre versioni del logo (chiara, scura, altre varianti del canale) e come riserva si usa l'elenco pubblico di loghi di [iptv-org](https://github.com/iptv-org/database). Se nessuno si scarica, il browser viene rimandato al logo originale. |
-| `GET /channels/{id}/schedule?date=AAAA-MM-GG` | Palinsesto del giorno (ora italiana, default oggi): i programmi che iniziano in quel giorno. |
-| `GET /guide?date=AAAA-MM-GG&platform=...` | Tutti i canali con i programmi in onda nel giorno, anche solo in parte: i dati della griglia. |
-| `GET /channels/{id}/now?at=...` | Programma in onda e successivo su un canale. |
-| `GET /now?platform=dtt\|tivusat\|sky&at=...` | In onda ora e a seguire su tutti i canali. `at` è facoltativo; senza fuso orario si intende ora italiana. |
-| `GET /health` | Esito dell'ultima ingestione per ogni fonte; `degraded` se una fonte è fallita o non è ancora stata letta. |
-
-Con `SEATV_API_KEYS` impostata, tutti gli endpoint tranne il logo richiedono la chiave nell'header `X-API-Key` o nel parametro `?api_key=`; senza chiave rispondono 401. La pagina web, `/docs` e `/openapi.json` restano aperti.
-
-La documentazione interattiva è su `/docs`, con i colori e il logo di SEA-TV; lo schema OpenAPI è su `/openapi.json`.
+| `epg.xml.gz`, `epg.xml` | Feed XMLTV di tutti i canali, da oggi per 7 giorni. Se `epg.xml` superasse i 25 MiB per file di Cloudflare si pubblica solo la versione compressa. |
+| `api/health.json` | Data dell'aggiornamento, giorni disponibili, esito di ogni fonte, nomi dei feed. `status` è `degraded` se una fonte è fallita. |
+| `api/channels.json` | Elenco canali con numeri per piattaforma, fonti e logo. |
+| `api/channels/{id}.json` | Un canale con tutti i suoi programmi. |
+| `api/guide/AAAA-MM-GG.json` | Tutti i canali con i programmi in onda in quel giorno, anche solo in parte: i dati della griglia. |
+| `logos/{id}.png` | Logo del canale (PNG, JPEG, GIF o WebP). |
 
 Esempio di canale:
 
 ```json
-{"id": "rai1", "name": "Rai 1", "logo": "https://services.tivulaguida.it/uploads/channel/....png", "numbers": {"dtt": 1, "tivusat": 1, "sky": 101}, "sources": ["sky", "tivu"]}
+{"id": "rai1", "name": "Rai 1", "logo": "logos/rai1.png", "numbers": {"dtt": 1, "tivusat": 1, "sky": 101}, "sources": ["sky", "tivu"]}
 ```
 
-Gli orari dei programmi sono restituiti in ora italiana con offset, es. `2026-10-12T20:00:00+02:00`. Ogni programma indica anche la fonte (`"source": "tivu"`).
+Gli orari dei programmi sono in ora italiana con offset, es. `2026-10-12T20:00:00+02:00`, e ogni programma indica la fonte (`"source": "tivu"`).
+
+## Guida TV web
+
+In cima le schede di ciò che è in onda ora, sotto la griglia con una riga per canale, gli orari in orizzontale e una linea azzurra sull'ora attuale. Le schede filtrano per piattaforma (con i numeri di quella piattaforma), il menu **Fonte** mostra i canali di una fonte, **Feed e fonti** mostra gli indirizzi del feed e l'esito dell'ultimo aggiornamento. Cliccando un programma si aprono orari, durata, genere, descrizione, immagine, fonte e `tvg-id`. Da telefono la colonna dei canali mostra solo logo e numero.
 
 ## Fonti
 
 Le fonti sono intercambiabili (`seatv/sources/`): ognuna restituisce canali e programmi in un formato comune.
 
-- **`tivu`** (attiva di default): API di Tivù La Guida, che copre DTT nazionale e Tivùsat e riporta anche i numeri di canale. Endpoint ricavati dal grabber `sites/tivu.tv` di [iptv-org/epg](https://github.com/iptv-org/epg).
-- **`sky`** (attiva di default): API della Guida TV Sky, circa 150 canali della piattaforma Sky con i numeri del decoder. Endpoint ricavati dal grabber `sites/guidatv.sky.it` di iptv-org/epg.
-- **`xmltv`**: qualsiasi feed XMLTV, anche compresso `.gz`, indicato con `SEATV_XMLTV_URL`. Se il feed contiene `<lcn>`, il numero viene assegnato al DTT.
+- **`tivu`** (attiva di default): API di Tivù La Guida, che copre DTT nazionale e Tivùsat con i numeri di canale. Endpoint ricavati dal grabber `sites/tivu.tv` di [iptv-org/epg](https://github.com/iptv-org/epg).
+- **`sky`** (attiva di default): API della Guida TV Sky, circa 150 canali con i numeri del decoder. Endpoint ricavati dal grabber `sites/guidatv.sky.it` di iptv-org/epg.
+- **`xmltv`**: qualsiasi feed XMLTV, anche `.gz`, indicato con `SEATV_XMLTV_URL`.
 
-I canali delle diverse fonti vengono uniti per nome normalizzato: "Rai 1" e "Rai 1 HD" di Tivù e "Rai 1 HD" di Sky diventano un solo canale con id `rai1` e i numeri di tutte le piattaforme. Per i nomi scritti in modo diverso c'è una piccola tabella di alias in `seatv/sources/__init__.py`. Se una piattaforma elenca più varianti dello stesso canale, si tiene il numero più basso.
+I canali delle diverse fonti vengono uniti per nome normalizzato: "Rai 1" e "Rai 1 HD" di Tivù e "Rai 1 HD" di Sky diventano un solo canale `rai1` con i numeri di tutte le piattaforme. Per i nomi scritti in modo diverso c'è una tabella di alias in `seatv/sources/__init__.py`. Se due fonti coprono lo stesso canale vince la prima di `SEATV_SOURCES`, e Sky viene interrogata solo per i canali che Tivù non ha fornito.
 
-Se una fonte non risponde, le altre vanno avanti e `/health` riporta l'errore. Se manca Tivù, i palinsesti dei canali nazionali arrivano da Sky e i numeri del digitale terrestre vengono da una tabella di riserva (`seatv/lcn.py`).
+**Se una fonte non risponde** le altre vanno avanti e `api/health.json` riporta l'errore. I canali di quella fonte tengono i programmi dell'aggiornamento precedente non ancora finiti (la guida precedente resta nella cache di GitHub Actions). Se manca Tivù, i palinsesti nazionali arrivano da Sky e i numeri del digitale terrestre da una tabella di riserva (`seatv/lcn.py`). Se non risponde nessuna fonte e non c'è niente da riprendere, il sito pubblicato resta quello del giorno prima.
 
-Se due fonti coprono lo stesso canale vince la prima di `SEATV_SOURCES`: nome, logo e palinsesto di Rai 1 arrivano da Tivù, e Sky viene interrogata solo per i canali che Tivù non ha fornito.
+## Generare il sito sul proprio computer
 
-A ogni aggiornamento, i programmi di un canale nell'intervallo coperto dai dati nuovi vengono sostituiti, così un programma spostato di orario non resta duplicato.
+```bash
+python -m venv .venv && source .venv/bin/activate    # su Windows: .venv\Scripts\activate
+pip install -e ".[dev]"
 
-**Attenzione ai diritti:** nessuna di queste fonti concede in licenza i dati. Va bene per un prototipo o un uso personale; prima di aprire l'API al pubblico serve un accordo con gli editori o un fornitore licenziato (vedi la ricerca sulle fonti del progetto).
+python -m seatv.build                 # genera dist/
+python -m http.server -d dist 8000    # guida su http://localhost:8000/
+```
+
+Con `SEATV_FEED_TOKEN` impostato il sito va in `dist/<token>/`. Da lì si può anche pubblicare a mano con `npx wrangler pages deploy dist --project-name=seatv` (vedi la guida Cloudflare).
 
 ## Configurazione
 
-Tutto tramite variabili d'ambiente:
+Variabili d'ambiente, tutte facoltative:
 
 | Variabile | Default | Significato |
 |---|---|---|
-| `SEATV_DB_PATH` | `data/seatv.sqlite3` | File SQLite |
-| `SEATV_LOGO_DIR` | `logos/` accanto al database | Cartella della cache dei loghi |
-| `SEATV_LOGO_INDEX_URL` | elenco `logos.csv` di iptv-org | Loghi di riserva, aggiornati a ogni ingestione; vuoto per non usarli |
-| `SEATV_SOURCES` | `tivu,sky` | Fonti separate da virgola, in ordine di priorità: `tivu`, `sky`, `xmltv` |
-| `SEATV_TIVU_URL` | `https://services.tivulaguida.it` | Indirizzo dell'API Tivù, se il servizio si sposta |
+| `SEATV_FEED_TOKEN` | | Parte segreta del percorso (16-128 caratteri tra lettere, cifre, `-` e `_`); vuoto = sito nella radice |
+| `SEATV_PUBLIC_URL` | | Indirizzo del sito, es. `https://seatv.pages.dev`, per i link assoluti ai loghi nel feed |
+| `SEATV_SOURCES` | `tivu,sky` | Fonti in ordine di priorità: `tivu`, `sky`, `xmltv` |
 | `SEATV_XMLTV_URL` | | URL del feed XMLTV (necessario con `xmltv`) |
-| `SEATV_DAYS_AHEAD` | `7` | Giorni di palinsesto da scaricare, a partire da oggi; sono anche i giorni scelti nella pagina web |
-| `SEATV_RETENTION_DAYS` | `7` | Giorni di palinsesto passato da conservare |
-| `SEATV_REFRESH_HOURS` | `12` | Ogni quante ore aggiornare |
-| `SEATV_REFRESH_AT` | | Ora italiana dell'aggiornamento quotidiano, es. `05:00`; se impostata sostituisce `SEATV_REFRESH_HOURS` |
-| `SEATV_API_KEYS` | | Chiavi di accesso all'API separate da virgola; vuota = API aperta |
-| `SEATV_SCHEDULER` | `true` | `false` per disattivare l'aggiornamento automatico nel server (es. se si usa cron con `python -m seatv.ingest`) |
+| `SEATV_TIVU_URL` | `https://services.tivulaguida.it` | Indirizzo dell'API Tivù, se il servizio si sposta |
+| `SEATV_DAYS_AHEAD` | `7` | Giorni di palinsesto, a partire da oggi |
+| `SEATV_LOGO_INDEX_URL` | elenco `logos.csv` di iptv-org | Loghi di riserva; vuoto per non usarli |
+| `SEATV_OUT_DIR` | `dist` | Cartella del sito generato |
+| `SEATV_CACHE_DIR` | `.cache` | Loghi scaricati e guida precedente |
 | `SEATV_HTTP_TIMEOUT` | `20` | Timeout delle richieste in secondi |
 | `SEATV_HTTP_CONCURRENCY` | `4` | Richieste contemporanee verso ciascuna fonte |
 
@@ -117,19 +131,17 @@ I test non usano la rete: le risposte delle fonti sono simulate con i file in `t
 ## Struttura
 
 ```
-passenger_wsgi.py  avvio sotto Phusion Passenger (Plesk)
-Dockerfile         immagine Docker; docker-compose.yml per avviarla
-deploy/            script di aggiornamento, servizio systemd ed esempio di .env
-docs/plesk.md      installazione su Plesk
+.github/workflows/pubblica.yml  aggiornamento quotidiano e pubblicazione su Cloudflare Pages
+docs/cloudflare.md              messa in linea passo passo
 seatv/
-  config.py        configurazione da variabili d'ambiente
-  db.py            schema SQLite e query
-  ingest.py        scaricamento e salvataggio (anche da riga di comando)
-  main.py          app FastAPI e aggiornamento periodico
-  static/          pagina web della guida TV
-  sources/
-    tivu.py        fonte Tivù La Guida
-    sky.py         fonte Sky Guida TV
-    xmltv.py       fonte XMLTV generica
+  build.py        aggiornamento completo (python -m seatv.build)
+  collect.py      scaricamento dalle fonti e unione dei canali
+  model.py        la guida in memoria e la sua istantanea
+  logos.py        download e cache dei loghi
+  export/
+    xmltv.py      feed XMLTV
+    site.py       API JSON, pagina web e regole per Cloudflare Pages
+  sources/        tivu.py, sky.py, xmltv.py
+  web/            pagina della guida TV
 tests/
 ```

@@ -102,3 +102,10 @@ def test_sky_events():
     assert first.image == "https://guidatv.sky.it/uuid/00000000-0000-0000-0000-000000000001/cover"
     assert programmes[1].category == "Informazione"
     assert programmes[1].description is None
+
+
+def test_logo_headers_per_host():
+    from seatv.logos import _headers
+
+    assert _headers("https://upload.wikimedia.org/x.png")["User-Agent"].startswith("seatv/")
+    assert _headers("https://programmi.sky.it/logo/x.png")["User-Agent"].startswith("Mozilla/")
