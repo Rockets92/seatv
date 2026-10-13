@@ -287,6 +287,37 @@ function initials(name) {
   return name.split(/\s+/).map((w) => w[0]).join("").slice(0, 3).toUpperCase();
 }
 
+// Un logo quasi tutto bianco sparisce sul riquadro chiaro: si riconosce dalla
+// luminosità media dei pixel visibili e gli si dà un riquadro scuro.
+const lightLogos = new Map();
+function isLightLogo(img) {
+  if (lightLogos.has(img.src)) return lightLogos.get(img.src);
+  let light = false;
+  try {
+    const size = 32;
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = size;
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, size, size);
+    const data = ctx.getImageData(0, 0, size, size).data;
+    let sum = 0;
+    let weight = 0;
+    for (let i = 0; i < data.length; i += 4) {
+      const alpha = data[i + 3] / 255;
+      if (alpha < 0.1) continue;
+      sum += alpha * (0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]);
+      weight += alpha;
+    }
+    // Solo i loghi con sfondo trasparente: un logo su fondo bianco pieno resta com'è.
+    const coverage = weight / (size * size);
+    light = weight > 0 && coverage < 0.85 && sum / weight > 200;
+  } catch {
+    // Immagine di un altro sito (rimando alla fonte): non si può leggere, resta chiara.
+  }
+  lightLogos.set(img.src, light);
+  return light;
+}
+
 // Riquadro col logo del canale, servito dalla cache di SEA-TV; se manca, le iniziali.
 function logoTile(channel) {
   const tile = el("div", { class: "logo-tile", title: channel.name });
@@ -297,6 +328,9 @@ function logoTile(channel) {
   if (channel.logo) {
     const img = el("img", { src: `/channels/${encodeURIComponent(channel.id)}/logo`, alt: channel.name, loading: "lazy", decoding: "async" });
     img.addEventListener("error", fallback);
+    img.addEventListener("load", () => {
+      if (isLightLogo(img)) tile.classList.add("on-dark");
+    });
     tile.append(img);
   } else {
     fallback();
