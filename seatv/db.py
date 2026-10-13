@@ -121,15 +121,7 @@ class Database:
             """,
             (channel_id, name, logo, to_db_time(now)),
         )
-        for url in [u for u in (logo, *alt_logos) if u]:
-            conn.execute(
-                """
-                INSERT INTO channel_logos (channel_id, url, position)
-                SELECT ?, ?, COALESCE(MAX(position) + 1, 0) FROM channel_logos WHERE channel_id = ?
-                ON CONFLICT (channel_id, url) DO NOTHING
-                """,
-                (channel_id, url, channel_id),
-            )
+        self.add_logos(conn, channel_id, [u for u in (logo, *alt_logos) if u])
         for platform, lcn in numbers.items():
             if platform not in PLATFORMS:
                 continue
@@ -139,6 +131,18 @@ class Database:
                 ON CONFLICT (channel_id, platform) DO UPDATE SET lcn = excluded.lcn
                 """,
                 (channel_id, platform, lcn),
+            )
+
+    def add_logos(self, conn: sqlite3.Connection, channel_id: str, urls: list[str]) -> None:
+        """Aggiunge in coda i loghi di riserva non ancora noti."""
+        for url in urls:
+            conn.execute(
+                """
+                INSERT INTO channel_logos (channel_id, url, position)
+                SELECT ?, ?, COALESCE(MAX(position) + 1, 0) FROM channel_logos WHERE channel_id = ?
+                ON CONFLICT (channel_id, url) DO NOTHING
+                """,
+                (channel_id, url, channel_id),
             )
 
     def fill_missing_numbers(self, conn: sqlite3.Connection, platform: str, numbers: dict[str, int]) -> int:

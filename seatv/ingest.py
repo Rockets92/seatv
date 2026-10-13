@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
@@ -15,6 +16,7 @@ import httpx
 
 from seatv.config import ROME, Settings
 from seatv.db import Database
+from seatv import logo_index
 from seatv.lcn import DTT_FALLBACK
 from seatv.sources import Source, SourceChannel, clean_name
 from seatv.sources.sky import SkySource
@@ -156,6 +158,8 @@ async def run_ingest(
             db.finish_run(run_id, datetime.now(timezone.utc), result.channels, result.programmes, result.error)
             log.info("ingestione %s: %d canali, %d programmi", source.name, result.channels, result.programmes)
             results.append(result)
+        if settings.logo_index_url:
+            await add_fallback_logos(db, client, settings.logo_index_url)
     finally:
         if owns_client:
             await client.aclose()
@@ -166,6 +170,20 @@ async def run_ingest(
             log.info("numeri DTT di riserva assegnati a %d canali", filled)
         db.prune_programmes(conn, now - timedelta(days=settings.retention_days))
     return results
+
+
+async def add_fallback_logos(db: Database, client: httpx.AsyncClient, url: str) -> None:
+    """Aggiunge i loghi di iptv-org come riserva; un canale +1 usa quello del canale base."""
+    try:
+        index = await logo_index.fetch(client, url)
+    except httpx.HTTPError as exc:
+        log.warning("loghi di riserva non scaricati da %s: %s", url, exc)
+        return
+    ids = [channel["id"] for channel in db.list_channels()]
+    with db.connect() as conn:
+        for cid in ids:
+            urls = index.get(cid) or index.get(re.sub(r"plus(1|24)$", "", cid)) or []
+            db.add_logos(conn, cid, urls)
 
 
 def main() -> None:

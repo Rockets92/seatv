@@ -148,7 +148,11 @@ def test_channel_logo_falls_back_to_other_versions(settings):
         response = client.get("/channels/skyuno/logo")
         assert response.status_code == 200
         assert response.content == PNG
-        assert calls == ["/logo/skyuno_Light_Fit.png", "/logo/skyuno_Light_Padding.png"]
+        assert calls == [
+            "/logo/skyuno_Light_Fit.png",
+            "/logo/skyuno_Light_Fit.png",
+            "/logo/skyuno_Light_Padding.png",
+        ]
 
 
 def test_docs_page_is_branded(api):

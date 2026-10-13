@@ -15,6 +15,8 @@ from seatv.sources import SourceChannel, SourceProgramme, fetch_each_day
 
 API_URL = "https://apid.sky.it/gtv/v1"
 SITE_URL = "https://guidatv.sky.it"
+# guidatv.sky.it ora rimanda a programmi.sky.it: i loghi si cercano su entrambi.
+LOGO_HOSTS = ("https://programmi.sky.it", SITE_URL)
 # DTH = satellite.
 ENV = "DTH"
 LOGO_KEYS = ("logo", "logoPadding", "logoLight", "logoDark", "logoDarkPadding")
@@ -36,7 +38,10 @@ def parse_channels(payload: dict) -> list[SourceChannel]:
         number = item.get("number")
         # Sky dà lo stesso logo in più versioni; si prova prima quella per sfondi chiari.
         logos = list(dict.fromkeys(
-            f"{SITE_URL}{item[key]}" for key in LOGO_KEYS if isinstance(item.get(key), str) and item[key]
+            f"{host}{item[key]}"
+            for key in LOGO_KEYS
+            if isinstance(item.get(key), str) and item[key]
+            for host in LOGO_HOSTS
         ))
         channels.append(
             SourceChannel(

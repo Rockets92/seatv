@@ -52,7 +52,7 @@ def combined_handler(requests: list[httpx.Request]):
 
 @pytest.fixture
 def settings(tmp_path) -> Settings:
-    return Settings(db_path=str(tmp_path / "test.sqlite3"), scheduler_enabled=False, days_ahead=2)
+    return Settings(db_path=str(tmp_path / "test.sqlite3"), scheduler_enabled=False, days_ahead=2, logo_index_url="")
 
 
 @pytest.fixture

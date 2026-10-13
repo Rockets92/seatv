@@ -61,12 +61,31 @@ def test_sky_channels():
     assert channels["8001"].numbers == {"sky": 101}
     assert channels["8001"].channel_id == "rai1"
     assert channels["9114"].channel_id == "skyunoplus1"
-    assert channels["9001"].logo == "https://guidatv.sky.it/logo/skytg24_Light_Fit.png"
-    assert channels["9115"].alt_logos == (
+    assert channels["9001"].logos == [
+        "https://programmi.sky.it/logo/skytg24_Light_Fit.png",
+        "https://guidatv.sky.it/logo/skytg24_Light_Fit.png",
+    ]
+    assert channels["9115"].logos[2:4] == [
+        "https://programmi.sky.it/logo/skyuno_Light_Padding.png",
         "https://guidatv.sky.it/logo/skyuno_Light_Padding.png",
-        "https://guidatv.sky.it/logo/skyuno_Dark_Fit.png",
-        "https://guidatv.sky.it/logo/skyuno_Dark_Padding.png",
-    )
+    ]
+    assert len(channels["9115"].logos) == 8
+
+
+def test_logo_index_parse():
+    from seatv.logo_index import parse
+
+    text = """channel,feed,in_use,tags,width,height,format,url
+SkyUno.it,,TRUE,,960,274,PNG,https://upload.wikimedia.org/skyuno.png
+SkyUno.it,,TRUE,,960,274,SVG,https://upload.wikimedia.org/skyuno.svg
+SkyCinemaDue.it,Plus24,TRUE,,960,120,PNG,https://upload.wikimedia.org/due24.png
+DAZN3.uk,,TRUE,,512,249,PNG,https://i.imgur.com/dazn3.png
+Rai1.it,,FALSE,,1,1,PNG,https://example.org/old.png
+"""
+    assert parse(text) == {
+        "skyuno": ["https://upload.wikimedia.org/skyuno.png"],
+        "skycinemadueplus24": ["https://upload.wikimedia.org/due24.png"],
+    }
 
 
 def test_sky_events():

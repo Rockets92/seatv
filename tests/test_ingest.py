@@ -1,9 +1,10 @@
+import dataclasses
 from datetime import datetime, timezone
 
 import httpx
 import pytest
 
-from conftest import FIXTURES, NOW, combined_handler
+from conftest import FIXTURES, NOW, combined_handler, sky_handler
 
 from seatv.ingest import run_ingest
 from seatv.sources.sky import SkySource
@@ -134,3 +135,20 @@ async def test_tivu_base_url_is_configurable(settings, db):
     await run_ingest(settings, db, client=client, sources=[TivuSource(base_url="https://tivu.example.org/")], now=NOW)
     assert set(seen) == {"tivu.example.org"}
     assert db.get_channel("rai1")["logo"] == "https://tivu.example.org/x.png"
+
+
+@pytest.mark.anyio
+async def test_fallback_logos_from_iptv_org(settings, db):
+    index = "channel,feed,in_use,tags,width,height,format,url\nSkyUno.it,,TRUE,,1,1,PNG,https://upload.wikimedia.org/skyuno.png\n"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "index.example.org":
+            return httpx.Response(200, text=index)
+        return sky_handler([])(request)
+
+    client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    settings = dataclasses.replace(settings, logo_index_url="https://index.example.org/logos.csv")
+    await run_ingest(settings, db, client=client, sources=[SkySource()], now=NOW)
+    # Dopo i loghi di Sky, quello di iptv-org; il +1 usa quello del canale base.
+    assert db.logo_candidates("skyuno")[-1] == "https://upload.wikimedia.org/skyuno.png"
+    assert db.logo_candidates("skyunoplus1")[-1] == "https://upload.wikimedia.org/skyuno.png"

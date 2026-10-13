@@ -26,6 +26,8 @@ class Settings:
     xmltv_url: str | None = None
     # Indirizzo dell'API Tivù, da cambiare se il servizio si sposta.
     tivu_url: str = "https://services.tivulaguida.it"
+    # Elenco pubblico di loghi di riserva (iptv-org); vuoto = non usarlo.
+    logo_index_url: str = "https://raw.githubusercontent.com/iptv-org/database/master/data/logos.csv"
     # Giorni di palinsesto da scaricare a partire da oggi.
     days_ahead: int = 2
     # Giorni di palinsesto passato da conservare nel database.
@@ -49,6 +51,7 @@ class Settings:
             sources=sources,
             xmltv_url=env.get("SEATV_XMLTV_URL") or None,
             tivu_url=env.get("SEATV_TIVU_URL") or cls.tivu_url,
+            logo_index_url=env.get("SEATV_LOGO_INDEX_URL", cls.logo_index_url),
             days_ahead=int(env.get("SEATV_DAYS_AHEAD", cls.days_ahead)),
             retention_days=int(env.get("SEATV_RETENTION_DAYS", cls.retention_days)),
             refresh_hours=float(env.get("SEATV_REFRESH_HOURS", cls.refresh_hours)),

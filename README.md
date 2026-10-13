@@ -42,7 +42,7 @@ La pagina è fatta di file statici (`seatv/static/`) che leggono `GET /guide` e 
 |---|---|
 | `GET /channels?platform=dtt\|tivusat\|sky` | Elenco canali. Con `platform`, solo quelli numerati su quella piattaforma, ordinati per numero (LCN). |
 | `GET /channels/{id}` | Un canale, es. `/channels/rai1`. |
-| `GET /channels/{id}/logo` | Logo del canale (Tivù o Sky), scaricato una volta e poi servito dalla cache locale. Solo immagini PNG, JPEG, GIF e WebP. Se un indirizzo non funziona si provano le altre versioni del logo (chiara, scura, altre varianti del canale); se nessuna si scarica, il browser viene rimandato al logo originale. |
+| `GET /channels/{id}/logo` | Logo del canale (Tivù o Sky), scaricato una volta e poi servito dalla cache locale. Solo immagini PNG, JPEG, GIF e WebP. Se un indirizzo non funziona si provano le altre versioni del logo (chiara, scura, altre varianti del canale) e come riserva si usa l'elenco pubblico di loghi di [iptv-org](https://github.com/iptv-org/database). Se nessuno si scarica, il browser viene rimandato al logo originale. |
 | `GET /channels/{id}/schedule?date=AAAA-MM-GG` | Palinsesto del giorno (ora italiana, default oggi): i programmi che iniziano in quel giorno. |
 | `GET /guide?date=AAAA-MM-GG&platform=...` | Tutti i canali con i programmi in onda nel giorno, anche solo in parte: i dati della griglia. |
 | `GET /channels/{id}/now?at=...` | Programma in onda e successivo su un canale. |
@@ -85,6 +85,7 @@ Tutto tramite variabili d'ambiente:
 |---|---|---|
 | `SEATV_DB_PATH` | `data/seatv.sqlite3` | File SQLite |
 | `SEATV_LOGO_DIR` | `logos/` accanto al database | Cartella della cache dei loghi |
+| `SEATV_LOGO_INDEX_URL` | elenco `logos.csv` di iptv-org | Loghi di riserva, aggiornati a ogni ingestione; vuoto per non usarli |
 | `SEATV_SOURCES` | `tivu,sky` | Fonti separate da virgola, in ordine di priorità: `tivu`, `sky`, `xmltv` |
 | `SEATV_TIVU_URL` | `https://services.tivulaguida.it` | Indirizzo dell'API Tivù, se il servizio si sposta |
 | `SEATV_XMLTV_URL` | | URL del feed XMLTV (necessario con `xmltv`) |
