@@ -14,7 +14,7 @@ from datetime import date, datetime, timedelta, timezone
 
 import httpx
 
-from seatv.config import ROME, Settings
+from seatv.config import ROME, Settings, http_client
 from seatv.db import Database
 from seatv import logo_index
 from seatv.lcn import DTT_FALLBACK
@@ -132,11 +132,7 @@ async def run_ingest(
 
     owns_client = client is None
     if client is None:
-        client = httpx.AsyncClient(
-            timeout=settings.http_timeout,
-            headers={"User-Agent": "seatv/0.1 (+https://github.com/Rockets92/seatv)"},
-            follow_redirects=True,
-        )
+        client = http_client(settings)
     results = []
     covered: set[str] = set()
     try:

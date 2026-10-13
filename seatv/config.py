@@ -59,3 +59,16 @@ class Settings:
             http_timeout=float(env.get("SEATV_HTTP_TIMEOUT", cls.http_timeout)),
             http_concurrency=int(env.get("SEATV_HTTP_CONCURRENCY", cls.http_concurrency)),
         )
+
+
+def http_client(settings: Settings):
+    """Client HTTP condiviso. Gli errori di connessione, compresi i nomi che
+    il DNS a volte non risolve, si riprovano fino a 3 volte con attese crescenti."""
+    import httpx
+
+    return httpx.AsyncClient(
+        timeout=settings.http_timeout,
+        headers={"User-Agent": "seatv/0.1 (+https://github.com/Rockets92/seatv)"},
+        follow_redirects=True,
+        transport=httpx.AsyncHTTPTransport(retries=3),
+    )

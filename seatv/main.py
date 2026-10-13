@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from seatv.config import ROME, Settings
+from seatv.config import ROME, Settings, http_client as make_http_client
 from seatv.db import Database
 from seatv.ingest import run_ingest
 from seatv.logos import LogoCache
@@ -124,11 +124,7 @@ def create_app(settings: Settings | None = None, http_client: httpx.AsyncClient 
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        client = http_client or httpx.AsyncClient(
-            timeout=settings.http_timeout,
-            headers={"User-Agent": "seatv/0.1 (+https://github.com/Rockets92/seatv)"},
-            follow_redirects=True,
-        )
+        client = http_client or make_http_client(settings)
         app.state.logos = LogoCache(logo_dir, client)
         task = None
         if settings.scheduler_enabled:
