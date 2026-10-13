@@ -223,10 +223,11 @@ def create_app(settings: Settings | None = None, http_client: httpx.AsyncClient 
         urls = db.logo_candidates(channel.id)
         cached = await app.state.logos.get(channel.id, urls) if urls else None
         if cached is None:
-            if not urls:
-                raise HTTPException(status_code=404, detail="logo non disponibile")
             # Ultimo tentativo dal browser, che la fonte potrebbe accettare.
-            return RedirectResponse(urls[0], status_code=307)
+            target = app.state.logos.redirect_target(urls)
+            if target is None:
+                raise HTTPException(status_code=404, detail="logo non disponibile")
+            return RedirectResponse(target, status_code=307)
         path, media_type = cached
         return FileResponse(path, media_type=media_type, headers={"Cache-Control": "public, max-age=86400"})
 

@@ -26,6 +26,13 @@ HEADERS = {
     "Chrome/124.0 Safari/537.36",
     "Accept": "image/avif,image/webp,image/png,image/*;q=0.8,*/*;q=0.5",
 }
+# Wikimedia invece rifiuta i finti browser e chiede un nome con un recapito.
+WIKIMEDIA_HEADERS = {"User-Agent": "seatv/0.1 (+https://github.com/Rockets92/seatv)", "Accept": HEADERS["Accept"]}
+
+
+def _headers(url: str) -> dict[str, str]:
+    host = httpx.URL(url).host
+    return WIKIMEDIA_HEADERS if host == "wikimedia.org" or host.endswith(".wikimedia.org") else HEADERS
 # Solo immagini raster: un SVG servito dal nostro dominio potrebbe contenere script.
 SIGNATURES = {
     b"\x89PNG\r\n\x1a\n": ("png", "image/png"),
@@ -51,6 +58,8 @@ class LogoCache:
         self.directory = directory
         self.client = client
         self._failed: dict[str, float] = {}
+        # Indirizzi a cui la fonte ha risposto che il file non esiste.
+        self._missing: set[str] = set()
 
     def _stem(self, channel_id: str, url: str) -> str:
         # L'hash dell'indirizzo fa riscaricare il logo quando la fonte lo cambia.
@@ -74,12 +83,18 @@ class LogoCache:
             self._failed[url] = time.monotonic()
         return None
 
+    def redirect_target(self, urls: list[str]) -> str | None:
+        """Primo indirizzo che il browser può ancora provare: non quelli inesistenti."""
+        return next((url for url in urls if url not in self._missing), None)
+
     async def _download(self, channel_id: str, url: str) -> tuple[Path, str] | None:
         try:
-            response = await self.client.get(url, headers=HEADERS)
+            response = await self.client.get(url, headers=_headers(url))
             response.raise_for_status()
             content = response.content
         except httpx.HTTPError as exc:
+            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in (404, 410):
+                self._missing.add(url)
             log.warning("logo di %s non scaricato da %s: %s", channel_id, url, exc)
             return None
         ext = sniff(content) if len(content) <= MAX_BYTES else None

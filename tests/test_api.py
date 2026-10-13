@@ -153,6 +153,15 @@ def test_channel_logo_falls_back_to_other_versions(settings):
             "/logo/skyuno_Light_Fit.png",
             "/logo/skyuno_Light_Padding.png",
         ]
+        # Senza nessun logo valido e con tutti gli indirizzi inesistenti: 404, non un rimando.
+        assert client.get("/channels/skytg24/logo", follow_redirects=False).status_code == 404
+
+
+def test_logo_headers_per_host():
+    from seatv.logos import _headers
+
+    assert _headers("https://upload.wikimedia.org/x.png")["User-Agent"].startswith("seatv/")
+    assert _headers("https://programmi.sky.it/logo/x.png")["User-Agent"].startswith("Mozilla/")
 
 
 def test_docs_page_is_branded(api):
