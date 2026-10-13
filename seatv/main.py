@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from seatv.config import ROME, Settings
+from seatv.config import ROME, Settings, http_client as make_http_client
 from seatv.db import Database
 from seatv.ingest import run_ingest
 from seatv.logos import LogoCache
@@ -137,11 +137,7 @@ def create_app(settings: Settings | None = None, http_client: httpx.AsyncClient 
     logo_dir = Path(settings.logo_dir) if settings.logo_dir else Path(settings.db_path).parent / "logos"
 
     def new_client() -> httpx.AsyncClient:
-        return http_client or httpx.AsyncClient(
-            timeout=settings.http_timeout,
-            headers={"User-Agent": "seatv/0.1 (+https://github.com/Rockets92/seatv)"},
-            follow_redirects=True,
-        )
+        return http_client or make_http_client(settings)
 
     def logos() -> LogoCache:
         # Sotto Passenger (WSGI) il lifespan non viene eseguito: la cache nasce alla prima richiesta.
