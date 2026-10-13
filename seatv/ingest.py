@@ -87,7 +87,12 @@ async def ingest_source(
     with db.connect() as conn:
         for cid, group in groups.items():
             rep = representatives[cid]
-            db.upsert_channel(conn, cid, clean_name(rep.name), rep.logo, _merged_numbers(group), now)
+            # Il logo della variante scelta per primo, poi quelli delle altre (SD, HD...).
+            logos = list(dict.fromkeys(url for c in [rep, *group] for url in c.logos))
+            db.upsert_channel(
+                conn, cid, clean_name(rep.name), logos[0] if logos else None, _merged_numbers(group), now,
+                alt_logos=logos[1:],
+            )
             for channel in group:
                 db.link_source(conn, source.name, channel.source_id, cid)
     result.channels = len(groups)

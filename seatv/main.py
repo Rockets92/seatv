@@ -12,7 +12,7 @@ from typing import Literal
 import httpx
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.openapi.docs import get_swagger_ui_html
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -211,14 +211,22 @@ def create_app(settings: Settings | None = None, http_client: httpx.AsyncClient 
         "/channels/{channel_id}/logo",
         tags=["Canali"],
         response_class=FileResponse,
-        responses={200: {"content": {"image/png": {}}}, 404: {"description": "Canale senza logo"}},
+        responses={
+            200: {"content": {"image/png": {}}},
+            307: {"description": "Il server non è riuscito a scaricarlo: il browser lo chiede alla fonte"},
+            404: {"description": "Canale senza logo"},
+        },
     )
-    async def channel_logo(channel_id: str) -> FileResponse:
+    async def channel_logo(channel_id: str) -> Response:
         """Logo del canale, scaricato dalla fonte la prima volta e poi servito dalla cache."""
         channel = get_channel_or_404(channel_id)
-        cached = await app.state.logos.get(channel.id, channel.logo) if channel.logo else None
+        urls = db.logo_candidates(channel.id)
+        cached = await app.state.logos.get(channel.id, urls) if urls else None
         if cached is None:
-            raise HTTPException(status_code=404, detail="logo non disponibile")
+            if not urls:
+                raise HTTPException(status_code=404, detail="logo non disponibile")
+            # Ultimo tentativo dal browser, che la fonte potrebbe accettare.
+            return RedirectResponse(urls[0], status_code=307)
         path, media_type = cached
         return FileResponse(path, media_type=media_type, headers={"Cache-Control": "public, max-age=86400"})
 

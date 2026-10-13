@@ -32,6 +32,14 @@ CREATE TABLE IF NOT EXISTS channel_sources (
     PRIMARY KEY (source, source_channel_id)
 );
 
+-- Tutti gli indirizzi di logo noti per un canale, nell'ordine in cui provarli.
+CREATE TABLE IF NOT EXISTS channel_logos (
+    channel_id TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
+    url        TEXT NOT NULL,
+    position   INTEGER NOT NULL,
+    PRIMARY KEY (channel_id, url)
+);
+
 CREATE TABLE IF NOT EXISTS programmes (
     channel_id  TEXT NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
     start       TEXT NOT NULL,
@@ -98,8 +106,12 @@ class Database:
         logo: str | None,
         numbers: dict[str, int],
         now: datetime,
+        alt_logos: list[str] | tuple[str, ...] = (),
     ) -> None:
-        """Nome e logo restano quelli della prima fonte che ha visto il canale."""
+        """Nome e logo restano quelli della prima fonte che ha visto il canale.
+
+        Gli altri loghi (`alt_logos` e quelli delle fonti successive) restano
+        come riserva, se il primo non si riesce a scaricare."""
         conn.execute(
             """
             INSERT INTO channels (id, name, logo, updated_at) VALUES (?, ?, ?, ?)
@@ -109,6 +121,15 @@ class Database:
             """,
             (channel_id, name, logo, to_db_time(now)),
         )
+        for url in [u for u in (logo, *alt_logos) if u]:
+            conn.execute(
+                """
+                INSERT INTO channel_logos (channel_id, url, position)
+                SELECT ?, ?, COALESCE(MAX(position) + 1, 0) FROM channel_logos WHERE channel_id = ?
+                ON CONFLICT (channel_id, url) DO NOTHING
+                """,
+                (channel_id, url, channel_id),
+            )
         for platform, lcn in numbers.items():
             if platform not in PLATFORMS:
                 continue
@@ -221,6 +242,16 @@ class Database:
                 ).fetchall()
             numbers, sources = self._numbers(conn), self._sources(conn)
         return [self._channel(row, numbers, sources) for row in rows]
+
+    def logo_candidates(self, channel_id: str) -> list[str]:
+        """Loghi del canale da provare in ordine: prima quello pubblicato, poi le riserve."""
+        with self.connect() as conn:
+            row = conn.execute("SELECT logo FROM channels WHERE id = ?", (channel_id,)).fetchone()
+            rows = conn.execute(
+                "SELECT url FROM channel_logos WHERE channel_id = ? ORDER BY position", (channel_id,)
+            ).fetchall()
+        urls = [row["logo"]] if row and row["logo"] else []
+        return list(dict.fromkeys(urls + [r["url"] for r in rows]))
 
     def get_channel(self, channel_id: str) -> dict | None:
         with self.connect() as conn:

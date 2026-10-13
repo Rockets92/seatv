@@ -26,8 +26,14 @@ class SourceChannel:
     source_id: str
     name: str
     logo: str | None = None
+    # Altri loghi da provare se `logo` non si scarica (es. varianti chiare/scure).
+    alt_logos: tuple[str, ...] = ()
     # Numerazione per piattaforma: {"dtt": 1, "tivusat": 1, "sky": 101}.
     numbers: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def logos(self) -> list[str]:
+        return [url for url in (self.logo, *self.alt_logos) if url]
 
     @property
     def channel_id(self) -> str:

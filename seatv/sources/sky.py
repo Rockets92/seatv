@@ -17,6 +17,7 @@ API_URL = "https://apid.sky.it/gtv/v1"
 SITE_URL = "https://guidatv.sky.it"
 # DTH = satellite.
 ENV = "DTH"
+LOGO_KEYS = ("logo", "logoPadding", "logoLight", "logoDark", "logoDarkPadding")
 
 
 def _utc(value: datetime) -> str:
@@ -33,12 +34,17 @@ def parse_channels(payload: dict) -> list[SourceChannel]:
         if not item.get("id") or not item.get("name"):
             continue
         number = item.get("number")
+        # Sky dà lo stesso logo in più versioni; si prova prima quella per sfondi chiari.
+        logos = list(dict.fromkeys(
+            f"{SITE_URL}{item[key]}" for key in LOGO_KEYS if isinstance(item.get(key), str) and item[key]
+        ))
         channels.append(
             SourceChannel(
                 source_id=str(item["id"]),
                 name=item["name"].strip(),
                 # Percorso relativo sullo stesso host delle immagini dei programmi.
-                logo=f"{SITE_URL}{item['logo']}" if item.get("logo") else None,
+                logo=logos[0] if logos else None,
+                alt_logos=tuple(logos[1:]),
                 numbers={"sky": int(number)} if number else {},
             )
         )

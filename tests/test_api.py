@@ -2,9 +2,10 @@ import asyncio
 
 import pytest
 
-from conftest import NOW
+from conftest import NOW, sky_handler
 
 from seatv.ingest import run_ingest
+from seatv.sources.sky import SkySource
 from seatv.sources.tivu import TivuSource
 
 
@@ -117,9 +118,37 @@ def test_channel_logo_is_cached(settings, tivu_client):
         assert first.content == PNG
         assert client.get("/channels/rai1/logo").content == PNG
         assert calls == ["https://services.tivulaguida.it/uploads/channel/rai1hd.png"]
-        # Ciò che non è un'immagine raster (qui un SVG) non viene servito.
-        assert client.get("/channels/canale5/logo").status_code == 404
+        # Ciò che non è un'immagine raster (qui un SVG) non viene servito da noi:
+        # il browser viene rimandato alla fonte.
+        svg = client.get("/channels/canale5/logo", follow_redirects=False)
+        assert svg.status_code == 307
+        assert svg.headers["location"].startswith("https://services.tivulaguida.it/")
         assert client.get("/channels/nope/logo").status_code == 404
+
+
+def test_channel_logo_falls_back_to_other_versions(settings):
+    import httpx
+    from fastapi.testclient import TestClient
+
+    from seatv.main import create_app
+
+    calls: list[str] = []
+
+    def logos(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        assert request.headers["user-agent"].startswith("Mozilla/")
+        if request.url.path.endswith("_Light_Padding.png"):
+            return httpx.Response(200, content=PNG)
+        return httpx.Response(404)
+
+    app = create_app(settings, http_client=httpx.AsyncClient(transport=httpx.MockTransport(logos)))
+    with TestClient(app) as client:
+        sky_client = httpx.AsyncClient(transport=httpx.MockTransport(sky_handler([])))
+        asyncio.run(run_ingest(settings, app.state.db, client=sky_client, sources=[SkySource()], now=NOW))
+        response = client.get("/channels/skyuno/logo")
+        assert response.status_code == 200
+        assert response.content == PNG
+        assert calls == ["/logo/skyuno_Light_Fit.png", "/logo/skyuno_Light_Padding.png"]
 
 
 def test_docs_page_is_branded(api):

@@ -62,6 +62,11 @@ def test_sky_channels():
     assert channels["8001"].channel_id == "rai1"
     assert channels["9114"].channel_id == "skyunoplus1"
     assert channels["9001"].logo == "https://guidatv.sky.it/logo/skytg24_Light_Fit.png"
+    assert channels["9115"].alt_logos == (
+        "https://guidatv.sky.it/logo/skyuno_Light_Padding.png",
+        "https://guidatv.sky.it/logo/skyuno_Dark_Fit.png",
+        "https://guidatv.sky.it/logo/skyuno_Dark_Padding.png",
+    )
 
 
 def test_sky_events():
