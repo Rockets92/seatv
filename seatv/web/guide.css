@@ -218,10 +218,8 @@ a { color: inherit; }
 .field select option { background: var(--bg-2); }
 .field svg { width: 16px; height: 16px; fill: none; stroke: var(--muted); stroke-width: 2; flex: none; }
 .search input { width: 160px; }
-.now-btn {
-  height: 40px; padding: 0 18px; border-radius: 999px; border: 0;
-  background: var(--grad); font-weight: 800; color: #fff; box-shadow: var(--glow);
-}
+.tabs .short { display: none; }
+.views button[aria-selected="true"] { background: #eef4ff; color: #04102a; box-shadow: 0 0 18px rgba(238, 244, 255, .25); }
 
 /* --- griglia ------------------------------------------------------- */
 
@@ -291,6 +289,39 @@ a { color: inherit; }
   padding: 2px 8px; border-radius: 999px; background: var(--grad); color: #fff; font-size: 11px; font-weight: 800; box-shadow: var(--glow);
 }
 
+/* --- elenchi Adesso e Serata ------------------------------------ */
+
+/* Negli elenchi la riga "In onda ora" sarebbe un doppione. */
+body[data-view="now"] .onair, body[data-view="evening"] .onair { display: none; }
+.list { max-width: 1100px; margin: 0 auto; padding: 8px 24px calc(24px + var(--safe-bottom)); }
+.list-head { margin: 8px 0 12px; font-size: 16px; font-weight: 800; color: var(--muted); }
+.lrow {
+  display: grid; grid-template-columns: 200px 1fr; gap: 14px; align-items: center;
+  padding: 10px 0; border-bottom: 1px solid var(--line);
+}
+.lchan { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.lchan .logo-tile { width: 64px; height: 46px; }
+.lchan-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lchan-name b { color: var(--cyan); font-variant-numeric: tabular-nums; }
+.lprogs { display: grid; grid-template-columns: 3fr 2fr; gap: 10px; min-width: 0; }
+.lprog {
+  position: relative; display: flex; flex-direction: column; gap: 2px; min-width: 0; overflow: hidden;
+  padding: 9px 12px 10px 14px; border-radius: 12px; text-align: left;
+  background: var(--prog-bg); border: 1px solid var(--line);
+  transition: border-color .15s, box-shadow .15s;
+}
+.lprog::before { content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px; border-radius: 0 3px 3px 0; background: var(--src, var(--idle)); }
+.lprog:hover, .lprog:focus-visible { border-color: var(--cyan); box-shadow: var(--glow); outline: none; }
+.lprog.live { background: var(--live-bg); border-color: rgba(0, 194, 255, .55); }
+.lp-when { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.lp-when b { color: #bfe9ff; font-weight: 600; }
+.lp-when i { font-style: normal; }
+.lp-title { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lprog.main .lp-title { font-size: 15px; }
+.lp-cat { color: var(--faint); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 3px; background: rgba(255, 255, 255, .08); }
+.lp-bar span { display: block; height: 100%; background: var(--grad); box-shadow: var(--glow); }
+
 /* --- dettaglio programma ------------------------------------------ */
 
 .backdrop { position: fixed; inset: 0; z-index: 19; background: rgba(1, 4, 14, .6); backdrop-filter: blur(3px); }
@@ -357,25 +388,46 @@ a { color: inherit; }
 /* --- telefono: loghi al posto dei nomi ---------------------------- */
 
 @media (max-width: 760px) {
-  :root { --chan-w: 84px; --row-h: 68px; --toolbar-h: 112px; }
-  .hero { padding: calc(10px + var(--safe-top)) calc(14px + var(--safe-right)) 26px calc(14px + var(--safe-left)); }
-  .brand img { height: 44px; }
-  .pill { padding: 7px 12px; font-size: 13px; }
-  .days { margin-top: 12px; gap: 6px; }
+  :root { --chan-w: 84px; --row-h: 68px; --toolbar-h: 150px; }
+  /* Testata compatta: all'apertura la guida è subito sotto. */
+  .hero { padding: calc(6px + var(--safe-top)) calc(12px + var(--safe-right)) 8px calc(12px + var(--safe-left)); }
+  .brand img { height: 30px; }
+  .pill { padding: 5px 11px; font-size: 12px; gap: 6px; }
+  .days { margin-top: 6px; gap: 6px; }
   .round-btn { display: none; }
-  .day-list button { min-width: 64px; padding: 7px 8px; }
-  .wave { height: 70px; }
+  .day-list { padding: 2px; gap: 6px; }
+  .day-list button { flex-direction: row; gap: 5px; min-width: 0; padding: 5px 11px; border-radius: 999px; font-size: 13px; }
+  .day-list button small { font-size: 11px; }
+  .wave { display: none; }
+  .onair { display: none; }
   .sources-panel, .onair { padding-left: 14px; padding-right: 14px; }
   .onair-list { grid-auto-columns: 230px; }
-  .toolbar { padding: 8px calc(14px + var(--safe-right)) 8px calc(14px + var(--safe-left)); }
-  .tabs { width: 100%; }
-  .tabs button { flex: 1; padding: 7px 10px; font-size: 13px; }
+  .toolbar { gap: 6px; padding: 6px calc(12px + var(--safe-right)) 6px calc(12px + var(--safe-left)); }
+  .tabs { width: 100%; padding: 3px; }
+  .tabs button { flex: 1; padding: 6px 8px; font-size: 13px; }
+  .tabs .long { display: none; }
+  .tabs .short { display: inline; }
+  .views button { font-weight: 800; }
   .filters { width: 100%; }
-  .field.select { flex: none; max-width: 38%; }
+  .field { height: 36px; }
+  .field.select { flex: none; max-width: 36%; }
   .field.select select { width: 100%; }
   .search { flex: 1; min-width: 0; }
-  .search input { width: 100%; }
-  .now-btn { padding: 0 14px; }
+  .search input { width: 100%; font-size: 16px; } /* 16px: iPhone non ingrandisce la pagina */
+
+  .list { padding: 4px 10px calc(16px + var(--safe-bottom)); }
+  .list-head { font-size: 14px; margin: 6px 2px 4px; }
+  .lrow { grid-template-columns: 64px 1fr; gap: 10px; align-items: start; padding: 8px 0; }
+  .lchan { flex-direction: column; align-items: center; gap: 4px; }
+  .lchan .logo-tile { width: 60px; height: 42px; }
+  .lchan-name { font-size: 10px; max-width: 64px; color: var(--muted); text-align: center; }
+  .lchan-name b { font-size: 12px; }
+  .lprogs { grid-template-columns: 1fr; gap: 6px; }
+  .lprog { padding: 7px 10px 8px 12px; }
+  .lprog:not(.main) { flex-direction: row; align-items: baseline; gap: 6px; padding: 5px 10px 6px 12px; background: rgba(9, 26, 58, .35); }
+  .lprog:not(.main) .lp-when i { display: none; }
+  .lprog:not(.main) .lp-cat { display: none; }
+  .lprog:not(.main) .lp-title { font-weight: 600; font-size: 13px; color: #c8d6ec; }
 
   .corner { padding: 0 6px; justify-content: center; text-align: center; font-size: 11px; }
   .chan { padding: 0 8px; justify-content: center; }
