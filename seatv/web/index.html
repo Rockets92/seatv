@@ -11,6 +11,11 @@
 <link rel="icon" type="image/png" href="static/icon-192.png" sizes="192x192">
 <link rel="apple-touch-icon" href="static/apple-touch-icon.png">
 <meta name="theme-color" content="#020817">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SEA-TV">
 <link rel="stylesheet" href="static/guide.css">
 </head>
 <body>
@@ -22,6 +27,9 @@
       <img src="static/logo.png" alt="SEA-TV, Simple EPG API" width="960" height="316">
     </a>
     <div class="hero-actions">
+      <button type="button" id="install" class="pill install" hidden>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 19h14"/></svg> Installa
+      </button>
       <button type="button" id="sources-toggle" class="pill" aria-expanded="false" aria-controls="sources-panel">
         <span class="dot" id="sources-dot"></span> Feed e fonti
       </button>
@@ -103,6 +111,16 @@
   </div>
 </aside>
 <div class="backdrop" id="backdrop" hidden></div>
+
+<aside id="ios-install" class="ios-install" hidden role="dialog" aria-labelledby="ios-install-title">
+  <button type="button" class="close" id="ios-install-close" aria-label="Chiudi">×</button>
+  <h2 id="ios-install-title">Installa SEA-TV su iPhone</h2>
+  <ol>
+    <li>Tocca <strong>Condividi</strong> <svg class="share" viewBox="0 0 24 24" aria-label="icona Condividi"><path d="M12 15V3m0 0L8 7m4-4 4 4M6 11H5v10h14V11h-1"/></svg> nella barra di Safari.</li>
+    <li>Scegli <strong>Aggiungi alla schermata Home</strong>.</li>
+    <li>Apri SEA-TV dall'icona: la guida si apre a schermo intero.</li>
+  </ol>
+</aside>
 
 <script src="static/guide.js"></script>
 </body>

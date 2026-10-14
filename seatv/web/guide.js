@@ -583,5 +583,40 @@ function syncToolbarHeight() {
 window.addEventListener("resize", syncToolbarHeight);
 syncToolbarHeight();
 
+// --- app installabile (PWA) ---------------------------------------------
+
+const standalone = matchMedia("(display-mode: fullscreen), (display-mode: standalone)").matches || navigator.standalone === true;
+const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+let installPrompt = null;
+
+// Android e Chrome: il browser propone l'installazione, il pulsante la apre.
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  installPrompt = event;
+  $("install").hidden = false;
+});
+window.addEventListener("appinstalled", () => {
+  installPrompt = null;
+  $("install").hidden = true;
+});
+// iPhone e iPad: Safari non ha un comando, si spiegano i due tocchi.
+if (isIos && !standalone) $("install").hidden = false;
+
+$("install").addEventListener("click", async () => {
+  if (installPrompt) {
+    installPrompt.prompt();
+    await installPrompt.userChoice;
+    installPrompt = null;
+    $("install").hidden = true;
+  } else {
+    $("ios-install").hidden = false;
+  }
+});
+$("ios-install-close").addEventListener("click", () => { $("ios-install").hidden = true; });
+
+if ("serviceWorker" in navigator && location.protocol !== "file:") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+
 renderDays();
 loadGuide();
