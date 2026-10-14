@@ -94,6 +94,14 @@ async def test_installable_app(secret_settings):
 
     page = (site / "index.html").read_text()
     assert '<link rel="manifest" href="manifest.webmanifest">' in page
+    assert 'href="guida.html"' in page
+
+    # La guida d'uso è nel sito: README e guida Cloudflare, link interni come ancore.
+    docs = (site / "guida.html").read_text()
+    assert '<h2 id="readme">SEA-TV</h2>' in docs
+    assert 'id="cloudflare"' in docs and 'href="#cloudflare"' in docs
+    assert "<table>" in docs and "<pre><code>" in docs
+    assert "SEATV_FEED_TOKEN" in docs
     assert 'name="apple-mobile-web-app-capable" content="yes"' in page
 
     headers = (out / "_headers").read_text()

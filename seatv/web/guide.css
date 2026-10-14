@@ -365,7 +365,7 @@ body[data-view="now"] .onair, body[data-view="evening"] .onair { display: none; 
 
 /* --- app installata ---------------------------------------------- */
 
-.install svg, .ios-install .share { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.pill svg, .ios-install .share { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
 .ios-install .share { vertical-align: -3px; color: var(--cyan); }
 .ios-install {
   position: fixed; left: 50%; bottom: calc(16px + var(--safe-bottom)); z-index: 30;
@@ -386,6 +386,35 @@ body[data-view="now"] .onair, body[data-view="evening"] .onair { display: none; 
   .guide { padding-bottom: var(--safe-bottom); }
 }
 
+/* --- pagina della guida d'uso ------------------------------------ */
+
+.doc-bar {
+  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: calc(10px + var(--safe-top)) calc(20px + var(--safe-right)) 10px calc(20px + var(--safe-left));
+  background: rgba(2, 8, 23, .85); backdrop-filter: blur(14px); border-bottom: 1px solid var(--line);
+}
+.doc-bar .brand img { height: 36px; }
+.doc { max-width: 860px; margin: 0 auto; padding: 18px calc(20px + var(--safe-right)) calc(40px + var(--safe-bottom)) calc(20px + var(--safe-left)); line-height: 1.65; color: #c8d6ec; font-size: 15px; }
+.doc h1, .doc h2, .doc h3, .doc h4 { color: var(--text); line-height: 1.25; scroll-margin-top: 80px; }
+.doc h2 { font-size: 28px; margin: 36px 0 12px; }
+.doc h3 { font-size: 20px; margin: 30px 0 8px; padding-top: 10px; border-top: 1px solid var(--line); }
+.doc h4 { font-size: 16px; margin: 22px 0 6px; }
+.doc a { color: var(--cyan); }
+.doc strong { color: var(--text); }
+.doc code { padding: 1px 6px; border-radius: 6px; background: rgba(10, 110, 254, .14); border: 1px solid var(--line); color: var(--text); font-size: .9em; word-break: break-word; }
+.doc pre { overflow-x: auto; padding: 12px 14px; border-radius: 12px; background: rgba(2, 8, 23, .7); border: 1px solid var(--line); }
+.doc pre code { padding: 0; border: 0; background: none; font-size: 13px; word-break: normal; }
+.doc .table { overflow-x: auto; margin: 12px 0; }
+.doc table { border-collapse: collapse; min-width: 100%; font-size: 14px; }
+.doc th, .doc td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.doc th { color: var(--text); background: var(--glass); }
+.doc-toc { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 14px 16px; border-radius: var(--radius); background: var(--glass); border: 1px solid var(--line); }
+.doc-toc strong { width: 100%; }
+.doc-toc a { text-decoration: none; font-size: 14px; }
+.doc-toc .toc-1 { width: 100%; font-weight: 700; margin-top: 4px; }
+.doc-section + .doc-section { margin-top: 40px; padding-top: 10px; border-top: 2px solid var(--line-strong); }
+.doc-foot { margin-top: 40px; color: var(--muted); font-size: 13px; }
+
 /* --- telefono: loghi al posto dei nomi ---------------------------- */
 
 @media (max-width: 760px) {
@@ -394,6 +423,12 @@ body[data-view="now"] .onair, body[data-view="evening"] .onair { display: none; 
   .hero { padding: calc(6px + var(--safe-top)) calc(12px + var(--safe-right)) 8px calc(12px + var(--safe-left)); }
   .brand img { height: 30px; }
   .pill { padding: 5px 11px; font-size: 12px; gap: 6px; }
+  /* Su telefono Installa e Guida restano solo icone, così la testata sta in una riga. */
+  .hero-actions { gap: 6px; }
+  .pill .lbl { display: none; }
+  .pill:has(.lbl) { padding: 7px 9px; }
+  .doc-bar .brand img { height: 28px; }
+  .doc h2 { font-size: 24px; }
   .days { margin-top: 6px; gap: 6px; }
   .round-btn { display: none; }
   .day-list { padding: 2px; gap: 6px; }
