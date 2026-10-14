@@ -73,22 +73,26 @@
 </section>
 
 <div class="toolbar">
+  <div class="tabs views" role="tablist" aria-label="Vista" id="view-tabs">
+    <button type="button" role="tab" data-view="grid" aria-selected="true">Griglia</button>
+    <button type="button" role="tab" data-view="now" aria-selected="false">Adesso</button>
+    <button type="button" role="tab" data-view="evening" aria-selected="false">Serata</button>
+  </div>
   <div class="tabs" role="tablist" aria-label="Piattaforma" id="platform-tabs">
     <button type="button" role="tab" data-platform="" aria-selected="true">Tutti</button>
-    <button type="button" role="tab" data-platform="dtt" aria-selected="false">Digitale terrestre</button>
+    <button type="button" role="tab" data-platform="dtt" aria-selected="false"><span class="long">Digitale terrestre</span><span class="short">DTT</span></button>
     <button type="button" role="tab" data-platform="tivusat" aria-selected="false">Tivùsat</button>
     <button type="button" role="tab" data-platform="sky" aria-selected="false">Sky</button>
   </div>
   <div class="filters">
+    <label class="field search">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input type="search" id="search" placeholder="Canale o numero" aria-label="Cerca canale per nome o numero" enterkeyhint="search">
+    </label>
     <label class="field select">
       <span class="sr-only">Fonte</span>
       <select id="source-filter" aria-label="Fonte"><option value="">Tutte le fonti</option></select>
     </label>
-    <label class="field search">
-      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-      <input type="search" id="search" placeholder="Cerca" aria-label="Cerca canale">
-    </label>
-    <button type="button" id="jump-now" class="now-btn">Adesso</button>
   </div>
 </div>
 

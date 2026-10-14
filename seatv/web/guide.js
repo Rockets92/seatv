@@ -8,9 +8,22 @@ const MIN = 60 * 1000;
 const SOURCE_LABELS = { tivu: "Tivù La Guida", sky: "Sky Guida TV", xmltv: "XMLTV" };
 const PLATFORM_LABELS = { dtt: "DTT", tivusat: "Tivùsat", sky: "Sky" };
 
+// Scelte che restano tra un'apertura e l'altra (vista e piattaforma).
+const saved = (() => {
+  try { return JSON.parse(localStorage.getItem("seatv") || "{}"); } catch { return {}; }
+})();
+function remember() {
+  try { localStorage.setItem("seatv", JSON.stringify({ view: state.view, platform: state.platform })); } catch { /* niente */ }
+}
+
+const VIEWS = ["grid", "now", "evening"];
+const PLATFORMS = ["", "dtt", "tivusat", "sky"];
+
 const state = {
   date: todayInRome(),
-  platform: "",
+  // "grid": griglia oraria; "now": in onda adesso; "evening": prima e seconda serata.
+  view: VIEWS.includes(saved.view) ? saved.view : "grid",
+  platform: PLATFORMS.includes(saved.platform) ? saved.platform : "",
   source: "",
   query: "",
   guide: null,
@@ -232,13 +245,23 @@ function renderStatus(message, hint) {
   $("guide").replaceChildren(box);
 }
 
+// Il canale si cerca per nome ("rai 3", "rai3") o per numero ("5", "105").
+function matchesQuery(channel, query) {
+  if (!query) return true;
+  if (/^\d+$/.test(query)) {
+    const numbers = state.platform ? [channel.numbers[state.platform]] : Object.values(channel.numbers);
+    return numbers.some((n) => String(n) === query);
+  }
+  const compact = (text) => text.toLowerCase().replace(/[^a-z0-9àèéìòù+]/g, "");
+  return channel.name.toLowerCase().includes(query) || compact(channel.name).includes(compact(query));
+}
+
 function visibleRows() {
   const query = state.query.trim().toLowerCase();
   const rows = (state.guide?.channels || []).filter(({ channel }) => {
     if (state.platform && channel.numbers[state.platform] === undefined) return false;
     if (state.source && !channel.sources.includes(state.source)) return false;
-    if (query && !channel.name.toLowerCase().includes(query)) return false;
-    return true;
+    return matchesQuery(channel, query);
   });
   // Con una piattaforma scelta, in ordine di numero su quella piattaforma.
   if (state.platform) rows.sort((a, b) => a.channel.numbers[state.platform] - b.channel.numbers[state.platform]);
@@ -253,6 +276,7 @@ function channelNumber(channel) {
 
 function renderGuide() {
   if (!state.guide) return;
+  document.body.dataset.view = state.view;
   renderOnAir();
   if (!state.guide.channels.length) {
     renderStatus("Nessun canale in questa guida.");
@@ -261,6 +285,10 @@ function renderGuide() {
   const rows = visibleRows();
   if (!rows.length) {
     renderStatus("Nessun canale corrisponde ai filtri.");
+    return;
+  }
+  if (state.view !== "grid") {
+    renderList(rows);
     return;
   }
 
@@ -304,12 +332,97 @@ function renderGuide() {
   }
 
   const container = $("guide");
-  const keepScroll = container.dataset.date === state.date ? container.scrollLeft : null;
+  const sameView = container.dataset.date === state.date && container.dataset.view === "grid";
+  const keepScroll = sameView ? container.scrollLeft : null;
+  const keepTop = sameView ? container.scrollTop : 0;
   container.replaceChildren(grid);
   container.dataset.date = state.date;
+  container.dataset.view = "grid";
+  container.scrollTop = keepTop;
   if (keepScroll !== null) container.scrollLeft = keepScroll;
   else scrollToNow(false);
   pinTitles();
+}
+
+// --- elenchi Adesso e Serata ----------------------------------------------
+
+const EVENING_FROM = 20 * 60 + 25; // la prima serata inizia tra le 20:25...
+const EVENING_TO = 22 * 60; // ...e le 22:00
+const EVENING_AT = 21 * 60 + 30; // in mancanza, ciò che va in onda alle 21:30
+
+// Programma in onda e successivo.
+function nowPair(programmes, now) {
+  const index = programmes.findIndex((p) => Date.parse(p.start) <= now && now < Date.parse(p.stop));
+  return index < 0 ? [] : [programmes[index], programmes[index + 1]];
+}
+
+// Prima serata: il programma più lungo che inizia tra le 20:25 e le 22:00
+// (o quello in onda alle 21:30); seconda serata: il primo dopo, di almeno 20 minuti.
+function eveningPair(programmes) {
+  const at = (minutes) => state.dayStart + minutes * MIN;
+  const length = (p) => Date.parse(p.stop) - Date.parse(p.start);
+  let main = null;
+  for (const p of programmes) {
+    const start = Date.parse(p.start);
+    if (start >= at(EVENING_FROM) && start <= at(EVENING_TO) && length(p) >= 25 * MIN && (!main || length(p) > length(main))) main = p;
+  }
+  main ??= programmes.find((p) => Date.parse(p.start) <= at(EVENING_AT) && at(EVENING_AT) < Date.parse(p.stop));
+  if (!main) return [];
+  const after = programmes.slice(programmes.indexOf(main) + 1).find((p) => length(p) >= 20 * MIN);
+  return [main, after];
+}
+
+function listCard(channel, programme, label, now, main) {
+  const start = Date.parse(programme.start);
+  const stop = Date.parse(programme.stop);
+  const live = start <= now && now < stop;
+  return el("button", {
+    type: "button",
+    class: "lprog" + (main ? " main" : "") + (live ? " live" : ""),
+    style: sourceVar(programme.source),
+    onclick: () => openDetail(channel, programme),
+  },
+    el("span", { class: "lp-when" }, `${label} `, el("b", {}, fmtTime.format(start), el("i", {}, ` – ${fmtTime.format(stop)}`))),
+    el("span", { class: "lp-title" }, programme.title),
+    programme.category ? el("span", { class: "lp-cat" }, programme.category) : null,
+    live ? el("span", { class: "lp-bar" }, el("span", { style: { width: `${((now - start) / (stop - start)) * 100}%` } })) : null
+  );
+}
+
+function renderList(rows) {
+  const now = Date.now();
+  const evening = state.view === "evening";
+  const labels = evening ? ["Prima serata", "Seconda serata"] : ["Ora", "Dopo"];
+  const items = [];
+  for (const { channel, programmes } of rows) {
+    const [first, second] = evening ? eveningPair(programmes) : nowPair(programmes, now);
+    if (!first) continue;
+    const number = channelNumber(channel);
+    items.push(el("div", { class: "lrow" },
+      el("div", { class: "lchan", title: channel.name },
+        logoTile(channel),
+        el("span", { class: "lchan-name" }, number != null ? el("b", {}, `${number} `) : null, channel.name)
+      ),
+      el("div", { class: "lprogs" },
+        listCard(channel, first, labels[0], now, true),
+        second ? listCard(channel, second, labels[1], now, false) : null
+      )
+    ));
+  }
+  const title = evening
+    ? `Stasera in TV · ${capitalize(fmtDayLong.format(utcDate(state.date)))}`
+    : `In onda adesso · ${fmtTime.format(now)}`;
+  const list = el("div", { class: "list" },
+    el("h2", { class: "list-head" }, title),
+    ...(items.length ? items : [el("p", { class: "status" }, evening ? "Nessun programma in serata per questi canali." : "Nessun programma in onda per questi canali.")])
+  );
+  const container = $("guide");
+  const keepTop = container.dataset.view === state.view && container.dataset.date === state.date ? container.scrollTop : 0;
+  container.replaceChildren(list);
+  container.dataset.date = state.date;
+  container.dataset.view = state.view;
+  container.scrollTop = keepTop;
+  container.scrollLeft = 0;
 }
 
 // Se un programma inizia prima del bordo sinistro visibile, sposta il suo
@@ -525,6 +638,11 @@ function closeDetail() {
 
 function setDate(day) {
   state.date = day;
+  // Un altro giorno non ha un "adesso": si passa alla sua serata.
+  if (state.view === "now" && day !== todayInRome()) {
+    state.view = "evening";
+    for (const tab of $("view-tabs").querySelectorAll("button")) tab.setAttribute("aria-selected", String(tab.dataset.view === "evening"));
+  }
   renderDays();
   loadGuide();
 }
@@ -534,7 +652,26 @@ function setPlatform(platform) {
   for (const tab of $("platform-tabs").querySelectorAll("button")) {
     tab.setAttribute("aria-selected", String(tab.dataset.platform === platform));
   }
+  remember();
   renderGuide();
+}
+
+// Griglia, Adesso o Serata. "Adesso" vale solo per oggi; toccare di nuovo
+// "Griglia" riporta all'ora attuale.
+function setView(view) {
+  const again = view === state.view;
+  state.view = view;
+  for (const tab of $("view-tabs").querySelectorAll("button")) {
+    tab.setAttribute("aria-selected", String(tab.dataset.view === view));
+  }
+  remember();
+  const today = todayInRome();
+  if (view === "now" && state.date !== today && state.days.includes(today)) {
+    setDate(today);
+    return;
+  }
+  renderGuide();
+  if (view === "grid" && again) scrollToNow();
 }
 
 function stepDay(delta) {
@@ -556,9 +693,9 @@ $("search").addEventListener("input", (event) => {
   state.query = event.target.value;
   renderGuide();
 });
-$("jump-now").addEventListener("click", () => {
-  if (state.date !== todayInRome() && state.days.includes(todayInRome())) setDate(todayInRome());
-  else scrollToNow();
+$("view-tabs").addEventListener("click", (event) => {
+  const tab = event.target.closest("button[data-view]");
+  if (tab) setView(tab.dataset.view);
 });
 $("sources-toggle").addEventListener("click", () => {
   const panel = $("sources-panel");
@@ -618,5 +755,8 @@ if ("serviceWorker" in navigator && location.protocol !== "file:") {
   navigator.serviceWorker.register("sw.js").catch(() => {});
 }
 
+for (const tab of $("view-tabs").querySelectorAll("button")) tab.setAttribute("aria-selected", String(tab.dataset.view === state.view));
+for (const tab of $("platform-tabs").querySelectorAll("button")) tab.setAttribute("aria-selected", String(tab.dataset.platform === state.platform));
+document.body.dataset.view = state.view;
 renderDays();
 loadGuide();
