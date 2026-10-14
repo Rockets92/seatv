@@ -89,6 +89,13 @@ Gli orari dei programmi sono in ora italiana con offset, es. `2026-10-12T20:00:0
 
 In cima le schede di ciò che è in onda ora, sotto la griglia con una riga per canale, gli orari in orizzontale e una linea azzurra sull'ora attuale. Le schede filtrano per piattaforma (con i numeri di quella piattaforma), il menu **Fonte** mostra i canali di una fonte, **Feed e fonti** mostra gli indirizzi del feed e l'esito dell'ultimo aggiornamento. Cliccando un programma si aprono orari, durata, genere, descrizione, immagine, fonte e `tvg-id`. Da telefono la colonna dei canali mostra solo logo e numero.
 
+**Come app sul telefono.** La guida si installa come app a schermo intero, con la sua icona:
+
+- **Android** (Chrome): pulsante **Installa** in alto, oppure menu ⋮ → **Installa app** / **Aggiungi a schermata Home**;
+- **iPhone e iPad** (Safari): **Condividi** → **Aggiungi alla schermata Home** (il pulsante **Installa** lo ricorda).
+
+L'app si apre senza barre del browser e rispetta notch e barre di sistema. Pagina, loghi e guide già viste restano salvate sul telefono (service worker `sw.js`), quindi si apre anche senza rete; a ogni aggiornamento del sito scarica la versione nuova.
+
 ## Fonti
 
 Le fonti sono intercambiabili (`seatv/sources/`): ognuna restituisce canali e programmi in un formato comune.

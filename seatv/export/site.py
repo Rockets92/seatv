@@ -27,7 +27,10 @@ from seatv.model import Guide, Programme
 log = logging.getLogger(__name__)
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
-WEB_ASSETS = ("guide.css", "guide.js", "logo.png", "icon-192.png", "apple-touch-icon.png", "favicon.ico")
+WEB_ASSETS = (
+    "guide.css", "guide.js", "logo.png", "favicon.ico",
+    "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png",
+)
 # Cloudflare Pages non pubblica file più grandi di 25 MiB.
 MAX_FILE_BYTES = 25 * 1024 * 1024
 
@@ -71,6 +74,13 @@ def headers_file(prefix: str) -> str:
 
 {base}/logos/*
   Cache-Control: public, max-age=86400
+
+{base}/sw.js
+  Cache-Control: no-cache
+
+{base}/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: no-cache
 """
 
 
@@ -193,6 +203,13 @@ def write_site(guide: Guide, settings: Settings, days: list[date]) -> dict:
     for name in WEB_ASSETS:
         shutil.copyfile(WEB_DIR / name, site / "static" / name)
     shutil.copyfile(WEB_DIR / "index.html", site / "index.html")
+    # App installabile: manifest e service worker stanno nella cartella della
+    # guida, così valgono per tutto ciò che c'è sotto il token.
+    shutil.copyfile(WEB_DIR / "manifest.webmanifest", site / "manifest.webmanifest")
+    # La versione nel service worker cambia a ogni aggiornamento: l'app
+    # installata scarica pagina e stili nuovi al primo avvio successivo.
+    worker = (WEB_DIR / "sw.js").read_text(encoding="utf-8")
+    (site / "sw.js").write_text(worker.replace("__BUILD__", guide.generated_at.strftime("%Y%m%d%H%M%S")), encoding="utf-8")
     shutil.copyfile(WEB_DIR / "favicon.ico", out / "favicon.ico")
 
     # Radice e regole per Cloudflare Pages. Senza 404.html Pages risponderebbe

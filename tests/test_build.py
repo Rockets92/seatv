@@ -74,6 +74,34 @@ async def test_site_layout(secret_settings):
 
 
 @pytest.mark.anyio
+async def test_installable_app(secret_settings):
+    """La guida si installa come app: manifest, icone e service worker sotto il token."""
+    await run_build(secret_settings)
+    out = Path(secret_settings.out_dir)
+    site = out / TOKEN
+
+    manifest = json.loads((site / "manifest.webmanifest").read_text())
+    assert manifest["display"] == "fullscreen"
+    assert manifest["start_url"] == manifest["scope"] == "./"
+    for icon in manifest["icons"]:
+        assert (site / icon["src"]).is_file(), icon["src"]
+    assert {i["sizes"] for i in manifest["icons"]} >= {"192x192", "512x512"}
+    assert any(i["purpose"] == "maskable" for i in manifest["icons"])
+
+    worker = (site / "sw.js").read_text()
+    assert "__BUILD__" not in worker
+    assert 'const VERSION = "20261012' in worker
+
+    page = (site / "index.html").read_text()
+    assert '<link rel="manifest" href="manifest.webmanifest">' in page
+    assert 'name="apple-mobile-web-app-capable" content="yes"' in page
+
+    headers = (out / "_headers").read_text()
+    assert f"/{TOKEN}/sw.js\n  Cache-Control: no-cache" in headers
+    assert f"/{TOKEN}/manifest.webmanifest\n  Content-Type: application/manifest+json" in headers
+
+
+@pytest.mark.anyio
 async def test_xmltv_feed(secret_settings):
     await run_build(secret_settings)
     site = Path(secret_settings.out_dir) / TOKEN
