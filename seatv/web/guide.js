@@ -141,7 +141,7 @@ function renderDays() {
   $("prev-day").disabled = state.date <= days[0];
   $("next-day").disabled = state.date >= days[days.length - 1];
   for (const day of days) {
-    const label = day === today ? "Oggi" : day === addDays(today, 1) ? "Domani" : day === addDays(today, -1) ? "Ieri" : fmtDayShort.format(utcDate(day));
+    const label = day === today ? "Oggi" : day === addDays(today, 1) ? "Domani" : day === addDays(today, -1) ? "Ieri" : capitalize(fmtDayShort.format(utcDate(day)));
     const button = el(
       "button",
       { type: "button", "aria-current": day === state.date ? "date" : null, onclick: () => setDate(day) },
@@ -318,9 +318,14 @@ function renderGuide() {
     );
 
     const track = el("div", { class: "track", style: { width: `${width}px` } });
-    for (const programme of programmes) {
-      track.append(programmeBlock(channel, programme, now));
-    }
+    programmes.forEach((programme, i) => {
+      // Se la fonte sovrappone due programmi, il primo finisce dove inizia il successivo.
+      const next = programmes[i + 1];
+      const shown = next && Date.parse(next.start) < Date.parse(programme.stop) && Date.parse(next.start) > Date.parse(programme.start)
+        ? { ...programme, stop: next.start }
+        : programme;
+      track.append(programmeBlock(channel, shown, now, programme));
+    });
     grid.append(el("div", { class: "row" }, chan, track));
   }
 
@@ -549,7 +554,7 @@ function renderOnAir() {
   $("clock").textContent = fmtTime.format(now);
 }
 
-function programmeBlock(channel, programme, now) {
+function programmeBlock(channel, programme, now, original = programme) {
   const start = Date.parse(programme.start);
   const stop = Date.parse(programme.stop);
   const left = x(start);
@@ -562,13 +567,13 @@ function programmeBlock(channel, programme, now) {
       class: "prog" + (live ? " live" : stop <= now ? " past" : ""),
       style: { left: `${left}px`, width: `${Math.max(right - left - 2, 3)}px`, ...sourceVar(programme.source) },
       title: `${fmtTime.format(start)} ${programme.title}`,
-      onclick: () => openDetail(channel, programme),
+      onclick: () => openDetail(channel, original),
     },
     // Il testo resta visibile anche quando l'inizio del programma è fuori schermo.
     el("span", { class: "inner" },
       el("span", { class: "t" }, programme.title),
       el("span", { class: "h" },
-        `${fmtTime.format(start)} – ${fmtTime.format(stop)}`,
+        `${fmtTime.format(start)} – ${fmtTime.format(Date.parse(original.stop))}`,
         programme.category ? el("span", { class: "cat" }, ` · ${programme.category}`) : null)
     )
   );

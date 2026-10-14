@@ -84,6 +84,7 @@ a { color: inherit; }
 .day-list { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 4px 2px; }
 .day-list::-webkit-scrollbar { display: none; }
 .day-list button {
+  flex: none; /* con 7 giorni non si stringono: si scorre */
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   min-width: 78px; padding: 8px 12px; line-height: 1.2;
   border-radius: 14px; border: 1px solid var(--line);
