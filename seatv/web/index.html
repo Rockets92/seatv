@@ -5,24 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>SEA-TV Guida TV</title>
 <meta name="description" content="Guida TV dei canali italiani del digitale terrestre e del satellite.">
-<link rel="icon" href="/favicon.ico" sizes="any">
-<link rel="icon" type="image/png" href="/static/icon-192.png" sizes="192x192">
-<link rel="apple-touch-icon" href="/static/apple-touch-icon.png">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="static/favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="static/icon-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="static/apple-touch-icon.png">
 <meta name="theme-color" content="#020817">
-<link rel="stylesheet" href="/static/guide.css">
+<link rel="stylesheet" href="static/guide.css">
 </head>
 <body>
 <div class="aurora" aria-hidden="true"></div>
 
 <header class="hero">
   <div class="hero-bar">
-    <a class="brand" href="/" aria-label="SEA-TV, home">
-      <img src="/static/logo.png" alt="SEA-TV, Simple EPG API" width="960" height="316">
+    <a class="brand" href="./" aria-label="SEA-TV, home">
+      <img src="static/logo.png" alt="SEA-TV, Simple EPG API" width="960" height="316">
     </a>
     <div class="hero-actions">
-      <a class="pill" href="/docs">API</a>
       <button type="button" id="sources-toggle" class="pill" aria-expanded="false" aria-controls="sources-panel">
-        <span class="dot" id="sources-dot"></span> Fonti
+        <span class="dot" id="sources-dot"></span> Feed e fonti
       </button>
     </div>
   </div>
@@ -53,7 +54,7 @@
   </svg>
 </header>
 
-<section id="sources-panel" class="sources-panel" hidden aria-label="Stato delle fonti"></section>
+<section id="sources-panel" class="sources-panel" hidden aria-label="Feed XMLTV e stato delle fonti"></section>
 
 <section class="onair" id="onair" aria-labelledby="onair-title" hidden>
   <div class="section-head">
@@ -103,6 +104,6 @@
 </aside>
 <div class="backdrop" id="backdrop" hidden></div>
 
-<script src="/static/guide.js"></script>
+<script src="static/guide.js"></script>
 </body>
 </html>

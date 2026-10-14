@@ -1,4 +1,5 @@
-// Guida TV interattiva: legge /guide e /health e disegna la griglia canali × orari.
+// Guida TV interattiva: legge i file statici in api/ (generati da `python -m seatv.build`)
+// e disegna la griglia canali × orari. Tutti gli indirizzi sono relativi alla pagina.
 "use strict";
 
 const TZ = "Europe/Rome";
@@ -16,14 +17,9 @@ const state = {
   health: null,
   dayStart: 0,
   dayEnd: 0,
-  // Giorni scaricati da oggi in avanti; il valore vero arriva da /health.
-  daysAhead: 7,
+  // Giorni pubblicati (da api/health.json), da oggi in avanti.
+  days: [],
 };
-
-// Chiave dell'API, se il server la richiede (SEATV_API_KEYS): chiesta una volta e ricordata nel browser.
-const KEY_STORAGE = "seatv-api-key";
-let apiKey = "";
-try { apiKey = localStorage.getItem(KEY_STORAGE) || ""; } catch {}
 
 const $ = (id) => document.getElementById(id);
 const fmtTime = new Intl.DateTimeFormat("it-IT", { timeZone: TZ, hour: "2-digit", minute: "2-digit" });
@@ -63,26 +59,26 @@ function romeMidnight(dateStr) {
 
 // --- dati ----------------------------------------------------------------
 
+// Un file per giorno con tutti i canali; piattaforma, fonte e ricerca si
+// filtrano qui, senza altre richieste.
+const guideCache = new Map();
+
 async function loadGuide() {
   $("status") && ($("status").textContent = "Caricamento della guida…");
-  const params = new URLSearchParams({ date: state.date });
-  if (state.platform) params.set("platform", state.platform);
   try {
-    const [guide, health] = await Promise.all([
-      apiGet(`/guide?${params}`),
-      apiGet("/health"),
-    ]);
-    state.guide = guide;
-    state.health = health;
+    if (!state.health) {
+      state.health = await apiGet("api/health.json");
+      const today = todayInRome();
+      state.days = (state.health.days || []).filter((d) => d >= today);
+      if (!state.days.includes(state.date) && state.days.length) state.date = state.days[0];
+      renderDays();
+    }
+    if (!guideCache.has(state.date)) guideCache.set(state.date, await apiGet(`api/guide/${state.date}.json`));
+    state.guide = guideCache.get(state.date);
   } catch (err) {
     state.guide = null;
-    if (err.status === 401) renderKeyForm(Boolean(apiKey));
-    else renderStatus(`Impossibile leggere la guida: ${err.message}`);
+    renderStatus(err.status === 404 ? "Guida di questo giorno non ancora pubblicata." : `Impossibile leggere la guida: ${err.message}`);
     return;
-  }
-  if (state.health.days_ahead && state.health.days_ahead !== state.daysAhead) {
-    state.daysAhead = state.health.days_ahead;
-    renderDays();
   }
   state.dayStart = romeMidnight(state.date);
   state.dayEnd = romeMidnight(addDays(state.date, 1));
@@ -91,29 +87,9 @@ async function loadGuide() {
 }
 
 async function apiGet(url) {
-  const response = await fetch(url, { headers: apiKey ? { "X-API-Key": apiKey } : {} });
+  const response = await fetch(url, { cache: "no-cache" });
   if (!response.ok) throw Object.assign(new Error(`HTTP ${response.status}`), { status: response.status });
   return response.json();
-}
-
-function renderKeyForm(wrong) {
-  const input = el("input", { type: "password", placeholder: "Chiave API", autocomplete: "current-password", required: "" });
-  const form = el(
-    "form",
-    {
-      class: "key-form",
-      onsubmit: (event) => {
-        event.preventDefault();
-        apiKey = input.value.trim();
-        try { localStorage.setItem(KEY_STORAGE, apiKey); } catch {}
-        loadGuide();
-      },
-    },
-    input,
-    el("button", { type: "submit" }, "Entra")
-  );
-  renderStatus(wrong ? "Chiave non valida, riprova." : "Questa guida è riservata: inserisci la chiave API.", form);
-  input.focus();
 }
 
 // --- disegno -----------------------------------------------------------
@@ -147,12 +123,11 @@ function renderDays() {
   const list = $("day-list");
   list.replaceChildren();
   const today = todayInRome();
-  const last = addDays(today, state.daysAhead - 1);
-  // Solo i giorni scaricati: da oggi in avanti.
-  $("prev-day").disabled = state.date <= today;
-  $("next-day").disabled = state.date >= last;
-  for (let offset = 0; offset < state.daysAhead; offset++) {
-    const day = addDays(today, offset);
+  // Solo i giorni pubblicati, da oggi in avanti.
+  const days = state.days.length ? state.days : [today];
+  $("prev-day").disabled = state.date <= days[0];
+  $("next-day").disabled = state.date >= days[days.length - 1];
+  for (const day of days) {
     const label = day === today ? "Oggi" : day === addDays(today, 1) ? "Domani" : day === addDays(today, -1) ? "Ieri" : fmtDayShort.format(utcDate(day));
     const button = el(
       "button",
@@ -164,9 +139,60 @@ function renderDays() {
   }
 }
 
+// Indirizzo assoluto di un file del sito, da incollare nel programma IPTV.
+function siteUrl(path) {
+  return new URL(path, location.href.replace(/[?#].*$/, "")).href;
+}
+
+const FEED_LABELS = {
+  seatv: ["Id SEA-TV", "tvg-id come rai1, canale5"],
+  iptvorg: ["Liste iptv-org", "tvg-id come Rai1.it o Rai1.it@HD"],
+  epgshare: ["Liste epgshare01", "tvg-id come Rai.1.HD.it o La.5.it"],
+};
+
+function copyButton(url) {
+  const button = el("button", {
+    type: "button",
+    class: "copy",
+    onclick: async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        button.textContent = "Copiato";
+      } catch {
+        button.textContent = "Copia a mano";
+      }
+      setTimeout(() => (button.textContent = "Copia"), 2000);
+    },
+  }, "Copia");
+  return button;
+}
+
+// Un feed per schema di tvg-id: si sceglie quello che usa la propria playlist M3U.
+function feedCard() {
+  const rows = [];
+  for (const feed of state.health?.feeds || []) {
+    const [label, hint] = FEED_LABELS[feed.scheme] || [feed.scheme, ""];
+    const url = siteUrl(feed.gz);
+    const total = state.health?.channels ?? 0;
+    const matched = feed.scheme === "seatv" ? "" : ` · ${feed.channels} canali su ${total} con i loro id`;
+    rows.push(
+      el("p", {}, el("strong", {}, label), ` (${hint}${matched})`),
+      el("div", { class: "feed-url" }, el("code", {}, url), copyButton(url))
+    );
+  }
+  const when = state.health?.generated_at ? fmtStamp.format(new Date(state.health.generated_at)) : "?";
+  return el("article", { class: "source-card feed-card", style: { "--src": "var(--cyan)" } },
+    el("h3", {}, "Feed EPG per l'IPTV"),
+    el("p", {}, "Usa il feed che corrisponde ai tvg-id della tua playlist M3U.",
+      (state.health?.feeds || []).every((f) => f.xml) ? " Togliendo .gz dall'indirizzo hai la versione non compressa." : ""),
+    ...rows,
+    el("p", {}, "Aggiornato: ", el("strong", {}, when), " · ", el("strong", {}, String(state.health?.programmes ?? 0)), " programmi")
+  );
+}
+
 function renderSources() {
   const panel = $("sources-panel");
-  panel.replaceChildren();
+  panel.replaceChildren(feedCard());
   const runs = state.health?.sources || [];
   const dot = $("sources-dot");
   dot.className = "dot " + (state.health?.status === "ok" ? "ok" : runs.some((r) => r.error) ? "err" : "");
@@ -181,6 +207,7 @@ function renderSources() {
         el("h3", {}, el("span", { class: "dot " + (run.error ? "err" : "ok") }), SOURCE_LABELS[run.source] || run.source),
         el("p", {}, "Ultimo aggiornamento: ", el("strong", {}, when)),
         el("p", {}, el("strong", {}, String(run.channels)), " canali · ", el("strong", {}, String(run.programmes)), " programmi"),
+        run.reused ? el("p", {}, el("strong", {}, String(run.reused)), " canali dall'aggiornamento precedente") : null,
         run.error ? el("p", { class: "error" }, run.error) : null
       )
     );
@@ -200,18 +227,22 @@ function renderSources() {
 }
 
 function renderStatus(message, hint) {
-  const box = el("div", { class: "status", id: "status" }, el("img", { src: "/static/icon-192.png", alt: "" }), message);
+  const box = el("div", { class: "status", id: "status" }, el("img", { src: "static/icon-192.png", alt: "" }), message);
   if (hint) box.append(el("br"), hint);
   $("guide").replaceChildren(box);
 }
 
 function visibleRows() {
   const query = state.query.trim().toLowerCase();
-  return (state.guide?.channels || []).filter(({ channel }) => {
+  const rows = (state.guide?.channels || []).filter(({ channel }) => {
+    if (state.platform && channel.numbers[state.platform] === undefined) return false;
     if (state.source && !channel.sources.includes(state.source)) return false;
     if (query && !channel.name.toLowerCase().includes(query)) return false;
     return true;
   });
+  // Con una piattaforma scelta, in ordine di numero su quella piattaforma.
+  if (state.platform) rows.sort((a, b) => a.channel.numbers[state.platform] - b.channel.numbers[state.platform]);
+  return rows;
 }
 
 function channelNumber(channel) {
@@ -224,8 +255,7 @@ function renderGuide() {
   if (!state.guide) return;
   renderOnAir();
   if (!state.guide.channels.length) {
-    const hint = el("span", {}, "Avvia lo scaricamento con ", el("code", {}, "python -m seatv.ingest"), " e ricarica la pagina.");
-    renderStatus("Nessun canale nel database.", hint);
+    renderStatus("Nessun canale in questa guida.");
     return;
   }
   const rows = visibleRows();
@@ -354,7 +384,7 @@ function isLightLogo(img) {
   return light;
 }
 
-// Riquadro col logo del canale, servito dalla cache di SEA-TV; se manca, le iniziali.
+// Riquadro col logo del canale, pubblicato insieme al sito; se manca, le iniziali.
 function logoTile(channel) {
   const tile = el("div", { class: "logo-tile", title: channel.name });
   const fallback = () => {
@@ -362,7 +392,7 @@ function logoTile(channel) {
     tile.replaceChildren(initials(channel.name));
   };
   if (channel.logo) {
-    const img = el("img", { src: `/channels/${encodeURIComponent(channel.id)}/logo`, alt: channel.name, loading: "lazy", decoding: "async" });
+    const img = el("img", { src: channel.logo, alt: channel.name, loading: "lazy", decoding: "async" });
     img.addEventListener("error", fallback);
     img.addEventListener("load", () => {
       if (isLightLogo(img)) tile.classList.add("on-dark");
@@ -474,6 +504,10 @@ function openDetail(channel, programme) {
   for (const [platform, lcn] of Object.entries(channel.numbers)) {
     chips.push(el("span", { class: "chip" }, `${PLATFORM_LABELS[platform] || platform} ${lcn}`));
   }
+  const tvgIds = [channel.id, ...Object.values(channel.ids || {}).flat()];
+  for (const id of tvgIds) {
+    chips.push(el("span", { class: "chip", title: "tvg-id da usare nella playlist M3U" }, `tvg-id: ${id}`));
+  }
   $("detail-meta").replaceChildren(...chips);
   $("detail-desc").textContent = programme.description || "Nessuna descrizione disponibile.";
 
@@ -500,15 +534,16 @@ function setPlatform(platform) {
   for (const tab of $("platform-tabs").querySelectorAll("button")) {
     tab.setAttribute("aria-selected", String(tab.dataset.platform === platform));
   }
-  loadGuide();
+  renderGuide();
 }
 
-$("prev-day").addEventListener("click", () => {
-  if (state.date > todayInRome()) setDate(addDays(state.date, -1));
-});
-$("next-day").addEventListener("click", () => {
-  if (state.date < addDays(todayInRome(), state.daysAhead - 1)) setDate(addDays(state.date, 1));
-});
+function stepDay(delta) {
+  const index = state.days.indexOf(state.date) + delta;
+  if (index >= 0 && index < state.days.length) setDate(state.days[index]);
+}
+
+$("prev-day").addEventListener("click", () => stepDay(-1));
+$("next-day").addEventListener("click", () => stepDay(1));
 $("platform-tabs").addEventListener("click", (event) => {
   const tab = event.target.closest("button[data-platform]");
   if (tab) setPlatform(tab.dataset.platform);
@@ -522,7 +557,7 @@ $("search").addEventListener("input", (event) => {
   renderGuide();
 });
 $("jump-now").addEventListener("click", () => {
-  if (state.date !== todayInRome()) setDate(todayInRome());
+  if (state.date !== todayInRome() && state.days.includes(todayInRome())) setDate(todayInRome());
   else scrollToNow();
 });
 $("sources-toggle").addEventListener("click", () => {

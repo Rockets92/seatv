@@ -1,0 +1,127 @@
+# Ogni mattina scarica la guida TV, genera il sito statico (feed XMLTV, API
+# JSON, pagina web) e lo pubblica su Cloudflare Pages.
+#
+# Segreti del repository (Settings > Secrets and variables > Actions):
+#   CLOUDFLARE_API_TOKEN   token Cloudflare con il permesso "Cloudflare Pages: Edit"
+#   CLOUDFLARE_ACCOUNT_ID  id dell'account Cloudflare
+#   SEATV_FEED_TOKEN       parte segreta dell'indirizzo del feed (almeno 16 caratteri)
+# Variabili facoltative (stessa pagina, scheda Variables):
+#   CLOUDFLARE_PAGES_PROJECT  nome del progetto Pages (default: seatv)
+#   SEATV_PUBLIC_URL          indirizzo del sito, se diverso da https://<progetto>.pages.dev
+#
+# Senza i segreti Cloudflare il sito viene solo generato, senza pubblicarlo:
+# serve a controllare che le fonti rispondano.
+
+name: Aggiorna e pubblica la guida
+
+on:
+  schedule:
+    # 05:00 ora italiana: 03:00 UTC con l'ora legale, 04:00 UTC con l'ora solare.
+    # Gira a entrambe le ore e il primo passo tiene solo quella giusta.
+    - cron: "0 3 * * *"
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - claude/cloudflare-iptv-epg-cnz2e7
+    paths:
+      - "seatv/**"
+      - "pyproject.toml"
+      - ".github/workflows/pubblica.yml"
+
+# Mai due pubblicazioni insieme; una nuova aspetta quella in corso.
+concurrency:
+  group: pubblica-guida
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  pubblica:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'seatv' }}
+      SEATV_FEED_TOKEN: ${{ secrets.SEATV_FEED_TOKEN }}
+    steps:
+      - name: Controlla l'ora (05:00 a Roma)
+        id: ora
+        env:
+          EVENT: ${{ github.event_name }}
+          SCHEDULE: ${{ github.event.schedule }}
+        run: |
+          run=true
+          if [ "$EVENT" = "schedule" ]; then
+            offset=$(TZ=Europe/Rome date +%z)
+            if [ "$offset" = "+0200" ] && [ "$SCHEDULE" != "0 3 * * *" ]; then run=false; fi
+            if [ "$offset" = "+0100" ] && [ "$SCHEDULE" != "0 4 * * *" ]; then run=false; fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+          echo "Fuso di Roma $(TZ=Europe/Rome date +%z), evento $EVENT, esecuzione: $run"
+
+      - uses: actions/checkout@v4
+        if: steps.ora.outputs.run == 'true'
+
+      - uses: actions/setup-python@v5
+        if: steps.ora.outputs.run == 'true'
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Installa
+        if: steps.ora.outputs.run == 'true'
+        run: pip install -e ".[dev]"
+
+      - name: Test
+        if: steps.ora.outputs.run == 'true'
+        run: pytest -q
+
+      # Loghi già scaricati e guida precedente (usata se una fonte non risponde).
+      - uses: actions/cache@v4
+        if: steps.ora.outputs.run == 'true'
+        with:
+          path: .cache
+          key: seatv-cache-${{ github.run_id }}
+          restore-keys: seatv-cache-
+
+      - name: Scarica la guida e genera il sito
+        if: steps.ora.outputs.run == 'true'
+        env:
+          SEATV_PUBLIC_URL: ${{ vars.SEATV_PUBLIC_URL || format('https://{0}.pages.dev', vars.CLOUDFLARE_PAGES_PROJECT || 'seatv') }}
+        run: |
+          if [ -z "$SEATV_FEED_TOKEN" ]; then
+            # Solo per la prova senza segreti: questo sito non viene pubblicato.
+            export SEATV_FEED_TOKEN=prova-locale-non-pubblicata
+          fi
+          python -m seatv.build --out dist
+          python - <<'PY'
+          import json, os, pathlib
+          health = json.loads(pathlib.Path("dist", os.environ["SEATV_FEED_TOKEN"], "api/health.json").read_text())
+          lines = [f"**{health['channels']} canali, {health['programmes']} programmi** ({health['status']})", ""]
+          for s in health["sources"]:
+              esito = s["error"] or "ok"
+              lines.append(f"- {s['source']}: {s['channels']} canali, {s['programmes']} programmi, ripresi {s['reused']}: {esito}")
+          lines.append("")
+          for f in health["feeds"]:
+              lines.append(f"- feed {f['gz']}: {f['channels']} canali con gli id {f['scheme']}")
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+              f.write("\n".join(lines) + "\n")
+          PY
+          du -sh dist
+
+      - name: Pubblica su Cloudflare Pages
+        if: steps.ora.outputs.run == 'true' && env.CLOUDFLARE_API_TOKEN != '' && env.CLOUDFLARE_ACCOUNT_ID != '' && env.SEATV_FEED_TOKEN != ''
+        run: |
+          # Il progetto si crea al primo giro; dopo il comando dice che esiste già.
+          npx --yes wrangler@4 pages project create "$PAGES_PROJECT" --production-branch=main || true
+          npx --yes wrangler@4 pages deploy dist --project-name="$PAGES_PROJECT" --branch=main --commit-dirty=true
+
+      - name: Segreti mancanti
+        if: steps.ora.outputs.run == 'true' && (env.CLOUDFLARE_API_TOKEN == '' || env.CLOUDFLARE_ACCOUNT_ID == '' || env.SEATV_FEED_TOKEN == '')
+        run: |
+          echo "::warning::Sito generato ma non pubblicato: mancano CLOUDFLARE_API_TOKEN, CLOUDFLARE_ACCOUNT_ID o SEATV_FEED_TOKEN nei segreti del repository."

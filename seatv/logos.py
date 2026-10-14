@@ -1,9 +1,9 @@
 """Cache su disco dei loghi dei canali.
 
-La pagina web chiede i loghi a SEA-TV (`/channels/{id}/logo`) e non
-direttamente a Tivù o a Sky: così vengono scaricati una volta sola, funzionano
-anche se il sito di origine blocca i link esterni e restano disponibili se la
-fonte è momentaneamente irraggiungibile.
+I loghi si scaricano durante l'aggiornamento e si pubblicano insieme al sito:
+così la pagina e i programmi IPTV non dipendono da Tivù o da Sky, che a volte
+bloccano i link esterni. La cartella resta tra un aggiornamento e l'altro e
+ogni logo si riscarica solo quando la fonte ne cambia l'indirizzo.
 """
 
 from __future__ import annotations
@@ -58,8 +58,6 @@ class LogoCache:
         self.directory = directory
         self.client = client
         self._failed: dict[str, float] = {}
-        # Indirizzi a cui la fonte ha risposto che il file non esiste.
-        self._missing: set[str] = set()
 
     def _stem(self, channel_id: str, url: str) -> str:
         # L'hash dell'indirizzo fa riscaricare il logo quando la fonte lo cambia.
@@ -83,18 +81,12 @@ class LogoCache:
             self._failed[url] = time.monotonic()
         return None
 
-    def redirect_target(self, urls: list[str]) -> str | None:
-        """Primo indirizzo che il browser può ancora provare: non quelli inesistenti."""
-        return next((url for url in urls if url not in self._missing), None)
-
     async def _download(self, channel_id: str, url: str) -> tuple[Path, str] | None:
         try:
             response = await self.client.get(url, headers=_headers(url))
             response.raise_for_status()
             content = response.content
         except httpx.HTTPError as exc:
-            if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code in (404, 410):
-                self._missing.add(url)
             log.warning("logo di %s non scaricato da %s: %s", channel_id, url, exc)
             return None
         ext = sniff(content) if len(content) <= MAX_BYTES else None
