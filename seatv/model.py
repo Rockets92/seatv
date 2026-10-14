@@ -31,6 +31,9 @@ class Channel:
     # Logo pubblicato: percorso relativo nel sito (logos/rai1.png) o, se non
     # si è riusciti a scaricarlo, l'indirizzo originale.
     logo: str | None = None
+    # Id dello stesso canale nelle liste IPTV diffuse, per schema:
+    # {"iptvorg": ["Rai2.it", "Rai2.it@HD"], "epgshare": ["Rai.2.HD.it"]}.
+    external: dict[str, list[str]] = field(default_factory=dict)
 
     def public(self) -> dict:
         return {
@@ -39,6 +42,7 @@ class Channel:
             "logo": self.logo,
             "numbers": self.numbers,
             "sources": self.sources,
+            "ids": self.external,
         }
 
 

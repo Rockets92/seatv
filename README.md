@@ -43,13 +43,23 @@ https://<progetto>.pages.dev/<token>/epg.xml.gz
 
 Se il programma non legge i file compressi usa `epg.xml`. L'indirizzo esatto, con il pulsante per copiarlo, è anche nella guida web sotto **Feed e fonti**.
 
-Per abbinare i canali della playlist M3U alla guida, usa come `tvg-id` l'id del canale SEA-TV:
+Il programma IPTV abbina i canali della playlist M3U alla guida tramite il `tvg-id`, che deve essere uguale all'id del canale nel feed. Siccome le liste in circolazione usano schemi diversi, SEA-TV pubblica un feed per schema: scegli quello che corrisponde ai `tvg-id` della tua playlist.
+
+| Feed | `tvg-id` nella playlist | Esempi |
+|---|---|---|
+| `epg.xml.gz` | id SEA-TV | `rai1`, `canale5`, `skyunoplus1` |
+| `epg-iptvorg.xml.gz` | database e playlist di [iptv-org](https://github.com/iptv-org/iptv) | `Rai2.it`, `Rai2.it@SD`, `Rai2.it@HD`, `SkyUno.it@Plus1` |
+| `epg-epgshare.xml.gz` | feed di [epgshare01](https://epgshare01.online) e liste costruite su di esso | `Rai.2.HD.it`, `La.5.it` |
+
+Gli id esterni si scaricano a ogni aggiornamento (database di iptv-org e feed italiano di epgshare01) e si abbinano ai canali SEA-TV per nome; se una lista non risponde si usano gli id del giorno prima. Un canale senza corrispondenza resta con l'id SEA-TV. Nei feed iptv-org ed epgshare01 lo stesso canale compare con ciascuno dei suoi id, con il palinsesto ripetuto. Nella guida web il dettaglio di ogni programma mostra tutti i `tvg-id` del canale e **Feed e fonti** dice quanti canali hanno un id per ogni lista.
+
+Esempio con gli id SEA-TV:
 
 ```
 #EXTINF:-1 tvg-id="rai1" tvg-chno="1",Rai 1
 ```
 
-Gli id sono il nome in minuscolo senza spazi e senza "HD" (`rai1`, `canale5`, `skytg24`; il `+` diventa `plus`, quindi `skyunoplus1`). L'elenco completo è in `api/channels.json` e ogni programma nella guida web mostra il suo `tvg-id`. Per i programmi che abbinano per nome, ogni canale del feed elenca anche i nomi usati dalle fonti (es. "Rai 1" e "Rai 1 HD").
+Gli id SEA-TV sono il nome in minuscolo senza spazi e senza "HD" (il `+` diventa `plus`). L'elenco completo è in `api/channels.json`, dove ogni canale ha anche gli id delle altre liste (`"ids"`). Per i programmi che abbinano per nome, ogni canale del feed elenca anche i nomi usati dalle fonti (es. "Rai 1" e "Rai 1 HD").
 
 Gli orari del feed sono in ora italiana con offset (`20261013210000 +0200`), quindi il cambio dell'ora legale è gestito.
 
@@ -59,7 +69,8 @@ Tutti i percorsi sono relativi a `https://<progetto>.pages.dev/<token>/`:
 
 | Percorso | Contenuto |
 |---|---|
-| `epg.xml.gz`, `epg.xml` | Feed XMLTV di tutti i canali, da oggi per 7 giorni. Se `epg.xml` superasse i 25 MiB per file di Cloudflare si pubblica solo la versione compressa. |
+| `epg.xml.gz`, `epg.xml` | Feed XMLTV di tutti i canali, da oggi per 7 giorni. Se un file `.xml` superasse i 25 MiB per file di Cloudflare si pubblica solo la versione compressa. |
+| `epg-iptvorg.xml.gz`, `epg-epgshare.xml.gz` | Lo stesso feed con gli id dei canali di iptv-org e di epgshare01 (anche senza `.gz`). |
 | `api/health.json` | Data dell'aggiornamento, giorni disponibili, esito di ogni fonte, nomi dei feed. `status` è `degraded` se una fonte è fallita. |
 | `api/channels.json` | Elenco canali con numeri per piattaforma, fonti e logo. |
 | `api/channels/{id}.json` | Un canale con tutti i suoi programmi. |
@@ -115,6 +126,7 @@ Variabili d'ambiente, tutte facoltative:
 | `SEATV_TIVU_URL` | `https://services.tivulaguida.it` | Indirizzo dell'API Tivù, se il servizio si sposta |
 | `SEATV_DAYS_AHEAD` | `7` | Giorni di palinsesto, a partire da oggi |
 | `SEATV_LOGO_INDEX_URL` | elenco `logos.csv` di iptv-org | Loghi di riserva; vuoto per non usarli |
+| `SEATV_EXTERNAL_IDS` | `iptvorg,epgshare` | Liste di cui pubblicare il feed con i loro id; vuoto per pubblicare solo `epg.xml` |
 | `SEATV_OUT_DIR` | `dist` | Cartella del sito generato |
 | `SEATV_CACHE_DIR` | `.cache` | Loghi scaricati e guida precedente |
 | `SEATV_HTTP_TIMEOUT` | `20` | Timeout delle richieste in secondi |
@@ -138,6 +150,7 @@ seatv/
   collect.py      scaricamento dalle fonti e unione dei canali
   model.py        la guida in memoria e la sua istantanea
   logos.py        download e cache dei loghi
+  external_ids.py id dei canali nelle liste iptv-org ed epgshare01
   export/
     xmltv.py      feed XMLTV
     site.py       API JSON, pagina web e regole per Cloudflare Pages

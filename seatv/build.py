@@ -18,6 +18,7 @@ import httpx
 
 from seatv.collect import collect, guide_days
 from seatv.config import Settings, http_client
+from seatv.external_ids import SCHEMES
 from seatv.export.site import copy_logos, write_site
 from seatv.logos import LogoCache
 from seatv.model import Guide
@@ -25,6 +26,7 @@ from seatv.model import Guide
 log = logging.getLogger(__name__)
 
 SNAPSHOT = "guide.json.gz"
+EXTERNAL_IDS = "external-ids.json"
 
 
 def load_snapshot(cache_dir: Path) -> Guide | None:
@@ -42,6 +44,35 @@ def save_snapshot(guide: Guide, cache_dir: Path) -> None:
     cache_dir.mkdir(parents=True, exist_ok=True)
     data = json.dumps(guide.to_json(), ensure_ascii=False, separators=(",", ":")).encode()
     (cache_dir / SNAPSHOT).write_bytes(gzip.compress(data, mtime=0))
+
+
+async def load_external_ids(settings: Settings, client: httpx.AsyncClient, cache_dir: Path) -> dict[str, dict[str, list[str]]]:
+    """Id delle liste IPTV per schema. Se una lista non si scarica, si usa
+    l'ultima copia salvata, così i feed compatibili non perdono canali."""
+    path = cache_dir / EXTERNAL_IDS
+    try:
+        cached = json.loads(path.read_text()) if path.exists() else {}
+    except ValueError:
+        cached = {}
+    result = {}
+    for scheme in settings.external_ids:
+        try:
+            result[scheme] = await SCHEMES[scheme](client)
+        except (httpx.HTTPError, ValueError, SyntaxError) as exc:  # SyntaxError: XML rotto
+            log.warning("id della lista %s non scaricati (%s): si usa l'ultima copia", scheme, exc)
+            result[scheme] = cached.get(scheme, {})
+    if result:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps({**cached, **result}))
+    return result
+
+
+def assign_external_ids(guide: Guide, external: dict[str, dict[str, list[str]]]) -> None:
+    for scheme, by_slug in external.items():
+        for channel in guide.channels.values():
+            ids = by_slug.get(channel.id)
+            if ids:
+                channel.external[scheme] = ids
 
 
 async def download_logos(guide: Guide, cache: LogoCache, concurrency: int = 8) -> dict[str, Path]:
@@ -75,6 +106,7 @@ async def build(
         if not guide.programmes:
             raise RuntimeError("nessun programma scaricato da nessuna fonte: il sito pubblicato resta quello di prima")
         logos = await download_logos(guide, LogoCache(cache_dir / "logos", client))
+        assign_external_ids(guide, await load_external_ids(settings, client, cache_dir))
     finally:
         if owns_client:
             await client.aclose()

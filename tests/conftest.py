@@ -54,6 +54,7 @@ def settings(tmp_path) -> Settings:
         logo_index_url="",
         out_dir=str(tmp_path / "dist"),
         cache_dir=str(tmp_path / "cache"),
+        external_ids=(),
     )
 
 

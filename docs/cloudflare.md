@@ -70,7 +70,7 @@ https://seatv.pages.dev/<token>/epg.xml       feed XMLTV
 
 Il primo indirizzo, aperto dal browser, mostra anche gli altri due sotto **Feed e fonti**, con il pulsante per copiarli. L'indirizzo `https://seatv.pages.dev/` senza token mostra solo una pagina vuota.
 
-Per l'abbinamento dei canali nella playlist M3U vedi il README (`tvg-id`).
+Se i `tvg-id` della tua playlist sono come `Rai2.it` o `Rai2.it@HD` (iptv-org) usa `epg-iptvorg.xml.gz`; se sono come `La.5.it` (epgshare01) usa `epg-epgshare.xml.gz`. Dettagli nel README.
 
 ## Da sapere
 

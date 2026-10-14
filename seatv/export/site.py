@@ -55,12 +55,12 @@ def headers_file(prefix: str) -> str:
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
 
-{base}/epg.xml
+{base}/*.xml
   Content-Type: application/xml; charset=utf-8
   Cache-Control: public, max-age=900
   Access-Control-Allow-Origin: *
 
-{base}/epg.xml.gz
+{base}/*.xml.gz
   Content-Type: application/gzip
   Cache-Control: public, max-age=900
   Access-Control-Allow-Origin: *
@@ -95,6 +95,22 @@ def _write_json(path: Path, data) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
 
 
+def _write_feed(site: Path, stem: str, xml: bytes, scheme: str, matched: int) -> dict:
+    """Scrive <stem>.xml.gz e, se sta nel limite di Cloudflare, <stem>.xml."""
+    gz = gzip_bytes(xml)
+    if len(gz) > MAX_FILE_BYTES:
+        raise RuntimeError(f"{stem}.xml.gz è di {len(gz) / 1e6:.1f} MB, oltre il limite di 25 MiB di Cloudflare Pages")
+    (site / f"{stem}.xml.gz").write_bytes(gz)
+    feed = {"scheme": scheme, "gz": f"{stem}.xml.gz", "xml": None, "channels": matched}
+    if len(xml) <= MAX_FILE_BYTES:
+        (site / f"{stem}.xml").write_bytes(xml)
+        feed["xml"] = f"{stem}.xml"
+    else:
+        log.warning("%s.xml è di %.1f MB, oltre il limite di Cloudflare Pages: si pubblica solo %s.xml.gz", stem, len(xml) / 1e6, stem)
+    log.info("feed %s: %.1f MB (compresso %.1f MB), %d canali con i suoi id", stem, len(xml) / 1e6, len(gz) / 1e6, matched)
+    return feed
+
+
 def guide_dates(guide: Guide) -> list[date]:
     """Giorni (ora italiana) che hanno almeno un programma."""
     days = set()
@@ -118,18 +134,14 @@ def write_site(guide: Guide, settings: Settings, days: list[date]) -> dict:
             return logo
         return f"{settings.site_url}/{logo}" if settings.site_url else None
 
-    # Feed XMLTV.
-    xml = render_xmltv(guide, logo_url)
-    gz = gzip_bytes(xml)
-    (site / "epg.xml.gz").write_bytes(gz)
-    feeds = {"xml.gz": "epg.xml.gz"}
-    if len(xml) <= MAX_FILE_BYTES:
-        (site / "epg.xml").write_bytes(xml)
-        feeds["xml"] = "epg.xml"
-    else:
-        log.warning("epg.xml è di %.1f MB, oltre il limite di Cloudflare Pages: si pubblica solo epg.xml.gz", len(xml) / 1e6)
-    if len(gz) > MAX_FILE_BYTES:
-        raise RuntimeError(f"epg.xml.gz è di {len(gz) / 1e6:.1f} MB, oltre il limite di 25 MiB di Cloudflare Pages")
+    # Feed XMLTV: con gli id SEA-TV e, per ogni lista IPTV nota, con i suoi id.
+    feeds = [_write_feed(site, "epg", render_xmltv(guide, logo_url), "seatv", len(guide.channels))]
+    for scheme in settings.external_ids:
+        def ids(channel, scheme=scheme):
+            return channel.external.get(scheme) or [channel.id]
+
+        matched = sum(1 for c in guide.channels.values() if c.external.get(scheme))
+        feeds.append(_write_feed(site, f"epg-{scheme}", render_xmltv(guide, logo_url, ids), scheme, matched))
 
     # API JSON.
     api = site / "api"

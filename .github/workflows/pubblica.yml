@@ -106,6 +106,9 @@ jobs:
           for s in health["sources"]:
               esito = s["error"] or "ok"
               lines.append(f"- {s['source']}: {s['channels']} canali, {s['programmes']} programmi, ripresi {s['reused']}: {esito}")
+          lines.append("")
+          for f in health["feeds"]:
+              lines.append(f"- feed {f['gz']}: {f['channels']} canali con gli id {f['scheme']}")
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
               f.write("\n".join(lines) + "\n")
           PY

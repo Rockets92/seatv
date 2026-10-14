@@ -36,6 +36,9 @@ class Settings:
     # Indirizzo pubblico del sito (es. https://seatv.pages.dev), per i link
     # assoluti ai loghi nel feed XMLTV. Vuoto = loghi delle fonti originali.
     public_url: str = ""
+    # Liste IPTV di cui pubblicare un feed con i loro id dei canali
+    # ("iptvorg", "epgshare"); vuoto = solo il feed con gli id SEA-TV.
+    external_ids: tuple[str, ...] = ("iptvorg", "epgshare")
     http_timeout: float = 20.0
     http_concurrency: int = 4
 
@@ -57,6 +60,11 @@ class Settings:
             cache_dir=env.get("SEATV_CACHE_DIR") or cls.cache_dir,
             feed_token=(env.get("SEATV_FEED_TOKEN") or "").strip(),
             public_url=(env.get("SEATV_PUBLIC_URL") or "").strip().rstrip("/"),
+            external_ids=tuple(
+                s.strip().lower()
+                for s in env.get("SEATV_EXTERNAL_IDS", ",".join(cls.external_ids)).split(",")
+                if s.strip()
+            ),
             http_timeout=float(env.get("SEATV_HTTP_TIMEOUT") or cls.http_timeout),
             http_concurrency=int(env.get("SEATV_HTTP_CONCURRENCY") or cls.http_concurrency),
         )
@@ -68,6 +76,11 @@ class Settings:
             )
         if self.public_url and not self.public_url.startswith(("https://", "http://")):
             raise ValueError("SEATV_PUBLIC_URL deve iniziare con https://")
+        from seatv.external_ids import SCHEMES
+
+        unknown = set(self.external_ids) - set(SCHEMES)
+        if unknown:
+            raise ValueError(f"SEATV_EXTERNAL_IDS: schemi sconosciuti {sorted(unknown)}, ammessi {sorted(SCHEMES)}")
         if self.days_ahead < 1:
             raise ValueError("SEATV_DAYS_AHEAD deve essere almeno 1")
 

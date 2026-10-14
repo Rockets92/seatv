@@ -144,33 +144,49 @@ function siteUrl(path) {
   return new URL(path, location.href.replace(/[?#].*$/, "")).href;
 }
 
+const FEED_LABELS = {
+  seatv: ["Id SEA-TV", "tvg-id come rai1, canale5"],
+  iptvorg: ["Liste iptv-org", "tvg-id come Rai1.it o Rai1.it@HD"],
+  epgshare: ["Liste epgshare01", "tvg-id come Rai.1.HD.it o La.5.it"],
+};
+
+function copyButton(url) {
+  const button = el("button", {
+    type: "button",
+    class: "copy",
+    onclick: async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        button.textContent = "Copiato";
+      } catch {
+        button.textContent = "Copia a mano";
+      }
+      setTimeout(() => (button.textContent = "Copia"), 2000);
+    },
+  }, "Copia");
+  return button;
+}
+
+// Un feed per schema di tvg-id: si sceglie quello che usa la propria playlist M3U.
 function feedCard() {
-  const feeds = state.health?.feeds || {};
   const rows = [];
-  for (const [label, path] of [["XMLTV compresso (consigliato)", feeds["xml.gz"]], ["XMLTV", feeds.xml]]) {
-    if (!path) continue;
-    const url = siteUrl(path);
-    const button = el("button", {
-      type: "button",
-      class: "copy",
-      onclick: async () => {
-        try {
-          await navigator.clipboard.writeText(url);
-          button.textContent = "Copiato";
-        } catch {
-          button.textContent = "Copia a mano";
-        }
-        setTimeout(() => (button.textContent = "Copia"), 2000);
-      },
-    }, "Copia");
-    rows.push(el("p", {}, el("strong", {}, label)), el("div", { class: "feed-url" }, el("code", {}, url), button));
+  for (const feed of state.health?.feeds || []) {
+    const [label, hint] = FEED_LABELS[feed.scheme] || [feed.scheme, ""];
+    const url = siteUrl(feed.gz);
+    const total = state.health?.channels ?? 0;
+    const matched = feed.scheme === "seatv" ? "" : ` · ${feed.channels} canali su ${total} con i loro id`;
+    rows.push(
+      el("p", {}, el("strong", {}, label), ` (${hint}${matched})`),
+      el("div", { class: "feed-url" }, el("code", {}, url), copyButton(url))
+    );
   }
   const when = state.health?.generated_at ? fmtStamp.format(new Date(state.health.generated_at)) : "?";
   return el("article", { class: "source-card feed-card", style: { "--src": "var(--cyan)" } },
     el("h3", {}, "Feed EPG per l'IPTV"),
+    el("p", {}, "Usa il feed che corrisponde ai tvg-id della tua playlist M3U.",
+      (state.health?.feeds || []).every((f) => f.xml) ? " Togliendo .gz dall'indirizzo hai la versione non compressa." : ""),
     ...rows,
-    el("p", {}, "Aggiornato: ", el("strong", {}, when), " · ", el("strong", {}, String(state.health?.programmes ?? 0)), " programmi"),
-    el("p", {}, "Nella playlist M3U usa come tvg-id l'id del canale, visibile nel dettaglio di ogni programma.")
+    el("p", {}, "Aggiornato: ", el("strong", {}, when), " · ", el("strong", {}, String(state.health?.programmes ?? 0)), " programmi")
   );
 }
 
@@ -488,7 +504,10 @@ function openDetail(channel, programme) {
   for (const [platform, lcn] of Object.entries(channel.numbers)) {
     chips.push(el("span", { class: "chip" }, `${PLATFORM_LABELS[platform] || platform} ${lcn}`));
   }
-  chips.push(el("span", { class: "chip", title: "Da usare come tvg-id nella playlist M3U" }, `tvg-id: ${channel.id}`));
+  const tvgIds = [channel.id, ...Object.values(channel.ids || {}).flat()];
+  for (const id of tvgIds) {
+    chips.push(el("span", { class: "chip", title: "tvg-id da usare nella playlist M3U" }, `tvg-id: ${id}`));
+  }
   $("detail-meta").replaceChildren(...chips);
   $("detail-desc").textContent = programme.description || "Nessuna descrizione disponibile.";
 
