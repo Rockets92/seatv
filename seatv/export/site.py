@@ -204,8 +204,8 @@ def write_site(guide: Guide, settings: Settings, days: list[date]) -> dict:
     for name in WEB_ASSETS:
         shutil.copyfile(WEB_DIR / name, site / "static" / name)
     shutil.copyfile(WEB_DIR / "index.html", site / "index.html")
-    # Guida d'uso (README e docs/cloudflare.md), raggiungibile dalla pagina.
-    (site / "guida.html").write_text(render_docs(), encoding="utf-8")
+    # Guida API (docs/api.md), raggiungibile dalla pagina, con l'indirizzo vero negli esempi.
+    (site / "guida-api.html").write_text(render_docs(base_url=settings.site_url), encoding="utf-8")
     # App installabile: manifest e service worker stanno nella cartella della
     # guida, così valgono per tutto ciò che c'è sotto il token.
     shutil.copyfile(WEB_DIR / "manifest.webmanifest", site / "manifest.webmanifest")

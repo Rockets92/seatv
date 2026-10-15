@@ -1,4 +1,4 @@
-"""Pagina `guida.html`: README e guida Cloudflare, leggibili dal sito.
+"""Pagina `guida-api.html`: la Guida API (docs/api.md), leggibile dal sito.
 
 I file Markdown del repository usano poche cose (titoli, paragrafi, elenchi,
 tabelle, blocchi di codice, grassetto, codice e link): questo convertitore
@@ -14,7 +14,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent.parent
 REPO_URL = "https://github.com/Rockets92/seatv"
 # (file, ancora nella pagina). L'ordine è quello della pagina.
-DOCS = (("README.md", "readme"), ("docs/cloudflare.md", "cloudflare"))
+DOCS = (("docs/api.md", "api"),)
+# Negli esempi della guida l'indirizzo del sito è scritto così; nella pagina
+# pubblicata diventa quello vero, se è noto.
+BASE_PLACEHOLDER = "https://seatv.pages.dev/<token>/"
 
 _INLINE = re.compile(
     r"`(?P<code>[^`]+)`"
@@ -128,7 +131,7 @@ PAGE = """<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>SEA-TV · Guida</title>
+<title>SEA-TV · Guida API</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#020817">
@@ -155,13 +158,16 @@ PAGE = """<!doctype html>
 """
 
 
-def render_docs(root: Path = ROOT) -> str:
+def render_docs(root: Path = ROOT, base_url: str = "") -> str:
     sections, toc = [], []
     for path, anchor in DOCS:
         file = root / path
         if not file.exists():
             continue
-        body, headings = to_html(file.read_text(encoding="utf-8"), anchor)
+        text = file.read_text(encoding="utf-8")
+        if base_url:
+            text = text.replace(BASE_PLACEHOLDER, base_url.rstrip("/") + "/")
+        body, headings = to_html(text, anchor)
         sections.append(f'<section class="doc-section">\n{body}\n</section>')
         toc.extend(
             f'<a class="toc-{level}" href="#{hid}">{html.escape(text)}</a>'
