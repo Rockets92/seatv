@@ -65,6 +65,8 @@ Gli orari del feed sono in ora italiana con offset (`20261013210000 +0200`), qui
 
 ## API JSON
 
+La spiegazione completa, con campi ed esempi, è in [docs/api.md](docs/api.md) (nel sito: pulsante **Guida API**).
+
 Tutti i percorsi sono relativi a `https://<progetto>.pages.dev/<token>/`:
 
 | Percorso | Contenuto |
@@ -87,7 +89,7 @@ Gli orari dei programmi sono in ora italiana con offset, es. `2026-10-12T20:00:0
 
 ## Guida TV web
 
-Tre viste: **Griglia** (una riga per canale, gli orari in orizzontale e una linea azzurra sull'ora attuale; toccandola di nuovo torna all'ora attuale), **Adesso** (per ogni canale il programma in onda e il successivo) e **Serata** (prima e seconda serata del giorno scelto). Il pulsante **Guida** in alto apre questa documentazione (README e guida Cloudflare) dentro il sito, in `guida.html`. La ricerca accetta il nome o il numero del canale; vista e piattaforma restano scelte alla prossima apertura. Da computer, sopra la griglia, ci sono anche le schede di ciò che è in onda ora. Le schede filtrano per piattaforma (con i numeri di quella piattaforma), il menu **Fonte** mostra i canali di una fonte, **Feed e fonti** mostra gli indirizzi del feed e l'esito dell'ultimo aggiornamento. Cliccando un programma si aprono orari, durata, genere, descrizione, immagine, fonte e `tvg-id`. Da telefono la colonna dei canali mostra solo logo e numero.
+Tre viste: **Griglia** (una riga per canale, gli orari in orizzontale e una linea azzurra sull'ora attuale; toccandola di nuovo torna all'ora attuale), **Adesso** (per ogni canale il programma in onda e il successivo) e **Serata** (prima e seconda serata del giorno scelto). Il pulsante **Guida API** in alto apre la spiegazione dell'API ([docs/api.md](docs/api.md)) dentro il sito, in `guida-api.html`, con l'indirizzo vero negli esempi. La ricerca accetta il nome o il numero del canale; vista e piattaforma restano scelte alla prossima apertura. Da computer, sopra la griglia, ci sono anche le schede di ciò che è in onda ora. Le schede filtrano per piattaforma (con i numeri di quella piattaforma), il menu **Fonte** mostra i canali di una fonte, **Feed e fonti** mostra gli indirizzi del feed e l'esito dell'ultimo aggiornamento. Cliccando un programma si aprono orari, durata, genere, descrizione, immagine, fonte e `tvg-id`. Da telefono la colonna dei canali mostra solo logo e numero.
 
 **Come app sul telefono.** La guida si installa come app a schermo intero, con la sua icona:
 

@@ -408,6 +408,7 @@ body[data-view="now"] .onair, body[data-view="evening"] .onair { display: none; 
 .doc table { border-collapse: collapse; min-width: 100%; font-size: 14px; }
 .doc th, .doc td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
 .doc th { color: var(--text); background: var(--glass); }
+.doc td:first-child code { white-space: nowrap; word-break: normal; }
 .doc-toc { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 14px 16px; border-radius: var(--radius); background: var(--glass); border: 1px solid var(--line); }
 .doc-toc strong { width: 100%; }
 .doc-toc a { text-decoration: none; font-size: 14px; }
