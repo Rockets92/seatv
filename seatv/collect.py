@@ -17,6 +17,7 @@ from seatv.sources import Source, SourceChannel, clean_name
 from seatv.sources.sky import SkySource
 from seatv.sources.tivu import TivuSource
 from seatv.sources.xmltv import XmltvSource
+from seatv.timeshift import add_timeshifts
 
 log = logging.getLogger(__name__)
 
@@ -151,6 +152,8 @@ async def collect(
     filled = guide.fill_missing_numbers("dtt", DTT_FALLBACK)
     if filled:
         log.info("numeri DTT di riserva assegnati a %d canali", filled)
+    # Prima di togliere i programmi finiti: il +24 di oggi è il palinsesto di ieri.
+    add_timeshifts(guide, previous)
     guide.prune(start)
     return guide
 
