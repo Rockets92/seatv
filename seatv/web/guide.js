@@ -32,6 +32,8 @@ const state = {
   dayEnd: 0,
   // Giorni pubblicati (da api/health.json), da oggi in avanti.
   days: [],
+  // Canali base mostrati in versione +1/+24: { skyuno: "skyunoplus1" }.
+  shift: {},
 };
 
 const $ = (id) => document.getElementById(id);
@@ -256,16 +258,77 @@ function matchesQuery(channel, query) {
   return channel.name.toLowerCase().includes(query) || compact(channel.name).includes(compact(query));
 }
 
+// Canali +1/+24 per canale base, dal ritardo più piccolo.
+function variantsOf(guide) {
+  if (!guide.variants) {
+    const ids = new Set(guide.channels.map((row) => row.channel.id));
+    guide.variants = new Map();
+    for (const row of guide.channels) {
+      const shift = row.channel.timeshift;
+      if (!shift || !ids.has(shift.of)) continue;
+      if (!guide.variants.has(shift.of)) guide.variants.set(shift.of, []);
+      guide.variants.get(shift.of).push(row);
+    }
+    for (const rows of guide.variants.values()) rows.sort((a, b) => a.channel.timeshift.hours - b.channel.timeshift.hours);
+  }
+  return guide.variants;
+}
+
+// Righe da mostrare: { channel, programmes } del canale (o della sua versione
+// +1/+24 scelta), con `base` il canale dell'elenco e `shifts` le sue versioni.
+// I +1/+24 non compaiono da soli: si vedono toccando il canale base.
 function visibleRows() {
   const query = state.query.trim().toLowerCase();
+  const variants = variantsOf(state.guide);
+  const hidden = new Set([...variants.values()].flat().map((row) => row.channel.id));
   const rows = (state.guide?.channels || []).filter(({ channel }) => {
+    if (hidden.has(channel.id)) return false;
     if (state.platform && channel.numbers[state.platform] === undefined) return false;
     if (state.source && !channel.sources.includes(state.source)) return false;
     return matchesQuery(channel, query);
   });
   // Con una piattaforma scelta, in ordine di numero su quella piattaforma.
   if (state.platform) rows.sort((a, b) => a.channel.numbers[state.platform] - b.channel.numbers[state.platform]);
-  return rows;
+  return rows.map((row) => {
+    const shifts = variants.get(row.channel.id) || [];
+    const chosen = shifts.find((v) => v.channel.id === state.shift[row.channel.id]);
+    return { ...(chosen || row), base: row.channel, shifts };
+  });
+}
+
+// Tocco sul canale: base, poi +1 (e +24), poi di nuovo base.
+function cycleShift(base, shifts) {
+  const order = [base.id, ...shifts.map((row) => row.channel.id)];
+  const next = order[(order.indexOf(state.shift[base.id] || base.id) + 1) % order.length];
+  if (next === base.id) delete state.shift[base.id];
+  else state.shift[base.id] = next;
+  renderGuide();
+}
+
+// Logo del canale; per la versione +1/+24 con il ritardo in un angolo.
+function rowLogo(channel, base) {
+  const tile = logoTile(channel);
+  if (channel.id !== base.id) tile.append(el("span", { class: "shift-tag" }, `+${channel.timeshift.hours}`));
+  return tile;
+}
+
+// Proprietà del riquadro del canale: se ha versioni +1/+24, il tocco le alterna.
+function shiftProps(base, shifts, cls) {
+  if (!shifts.length) return { class: cls };
+  const labels = shifts.map((row) => `+${row.channel.timeshift.hours}`).join(" o ");
+  return {
+    class: `${cls} shiftable${state.shift[base.id] ? " shifted" : ""}`,
+    role: "button",
+    tabindex: "0",
+    "aria-label": `${base.name}: tocca per la programmazione ${labels}`,
+    onclick: () => cycleShift(base, shifts),
+    onkeydown: (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        cycleShift(base, shifts);
+      }
+    },
+  };
 }
 
 function channelNumber(channel) {
@@ -306,11 +369,11 @@ function renderGuide() {
   grid.append(el("div", { class: "timeline" }, el("div", { class: "corner" }, capitalize(fmtDayLong.format(utcDate(state.date)))), ticks));
 
   const now = Date.now();
-  for (const { channel, programmes } of rows) {
-    const number = channelNumber(channel);
-    const chan = el("div", { class: "chan", title: channel.name },
+  for (const { channel, programmes, base, shifts } of rows) {
+    const number = channelNumber(base);
+    const chan = el("div", { ...shiftProps(base, shifts, "chan"), title: channel.name },
       el("span", { class: "chan-num" }, number ?? ""),
-      logoTile(channel),
+      rowLogo(channel, base),
       el("div", { class: "chan-text" },
         el("div", { class: "chan-name" }, channel.name),
         el("div", { class: "chan-src" }, ...channel.sources.map((s) => el("i", { title: SOURCE_LABELS[s] || s, style: sourceVar(s) })))
@@ -399,17 +462,18 @@ function renderList(rows) {
   const evening = state.view === "evening";
   const labels = evening ? ["Prima serata", "Seconda serata"] : ["Ora", "Dopo"];
   const items = [];
-  for (const { channel, programmes } of rows) {
+  for (const { channel, programmes, base, shifts } of rows) {
     const [first, second] = evening ? eveningPair(programmes) : nowPair(programmes, now);
-    if (!first) continue;
-    const number = channelNumber(channel);
+    // Una versione +1/+24 scelta resta visibile anche senza programmi, per tornare indietro.
+    if (!first && channel.id === base.id) continue;
+    const number = channelNumber(base);
     items.push(el("div", { class: "lrow" },
-      el("div", { class: "lchan", title: channel.name },
-        logoTile(channel),
+      el("div", { ...shiftProps(base, shifts, "lchan"), title: channel.name },
+        rowLogo(channel, base),
         el("span", { class: "lchan-name" }, number != null ? el("b", {}, `${number} `) : null, channel.name)
       ),
       el("div", { class: "lprogs" },
-        listCard(channel, first, labels[0], now, true),
+        first ? listCard(channel, first, labels[0], now, true) : el("p", { class: "status" }, "Nessun programma."),
         second ? listCard(channel, second, labels[1], now, false) : null
       )
     ));
@@ -468,7 +532,8 @@ function capitalize(text) {
 }
 
 function initials(name) {
-  return name.split(/\s+/).map((w) => w[0]).join("").slice(0, 3).toUpperCase();
+  // "Canale 5 +1" -> "C5": il ritardo si vede già nell'angolo del logo.
+  return name.split(/\s+/).filter((w) => w && !w.startsWith("+")).map((w) => w[0]).join("").slice(0, 3).toUpperCase();
 }
 
 // Un logo quasi tutto bianco sparisce sul riquadro chiaro: si riconosce dalla
@@ -531,14 +596,14 @@ function renderOnAir() {
     return;
   }
   const cards = [];
-  for (const { channel, programmes } of visibleRows()) {
+  for (const { channel, programmes, base } of visibleRows()) {
     const index = programmes.findIndex((p) => Date.parse(p.start) <= now && now < Date.parse(p.stop));
     if (index < 0) continue;
     const current = programmes[index];
     const next = programmes[index + 1];
     const start = Date.parse(current.start);
     const stop = Date.parse(current.stop);
-    const number = channelNumber(channel);
+    const number = channelNumber(base);
     cards.push(
       el("button", { type: "button", class: "onair-card", onclick: () => openDetail(channel, current) },
         logoTile(channel),

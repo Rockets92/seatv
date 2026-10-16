@@ -87,8 +87,13 @@ Ogni canale, in `channels.json` e negli altri file, ha questa forma:
 | `numbers` | Numero del canale per piattaforma: `dtt` (digitale terrestre), `tivusat`, `sky`. Una piattaforma manca se il canale non c'è |
 | `sources` | Fonti da cui arrivano i dati: `tivu` (Tivù La Guida), `sky` (Guida TV Sky), `xmltv` |
 | `ids` | Id dello stesso canale nelle liste IPTV (`iptvorg`, `epgshare`); vuoto se non trovato |
+| `timeshift` | Solo per i canali +1 e +24: `{"of": "rai1", "hours": 1}`, cioè il canale base e il ritardo in ore; `null` per gli altri |
 
-`channels.json` è in ordine di numero del digitale terrestre; i canali che non sono sul digitale terrestre seguono in ordine di nome.
+`channels.json` è in ordine di numero del digitale terrestre; i canali che non sono sul digitale terrestre seguono in ordine di nome. Ogni canale +1 o +24 viene subito dopo il suo canale base.
+
+### Canali +1 e +24
+
+I canali +1 (per esempio `rai1plus1`, "Rai 1 +1") trasmettono lo stesso palinsesto del canale base **un'ora dopo**; Sky Cinema Uno +24 (`skycinemaunoplus24`) lo trasmette **un giorno dopo**. Il palinsesto si ricava da quello del canale base spostando inizio e fine di ogni programma, quindi ha gli stessi titoli e descrizioni. Sono canali come gli altri in tutti i file JSON e nei feed XMLTV, con il campo `timeshift` e senza numeri propri (`numbers` vuoto). Nella pagina web non compaiono nell'elenco: si vedono toccando il logo del canale base.
 
 ### Programma
 

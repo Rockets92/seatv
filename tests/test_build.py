@@ -69,7 +69,7 @@ async def test_site_layout(secret_settings):
 
     assert health["status"] == "ok"
     assert health["days"] == ["2026-10-12", "2026-10-13"]
-    assert health["feeds"] == [{"scheme": "seatv", "gz": "epg.xml.gz", "xml": "epg.xml", "channels": 7}]
+    assert health["feeds"] == [{"scheme": "seatv", "gz": "epg.xml.gz", "xml": "epg.xml", "channels": 8}]
     assert json.loads((site / "api/health.json").read_text()) == health
 
 
@@ -120,7 +120,8 @@ async def test_xmltv_feed(secret_settings):
     root = ET.fromstring(xml)
     assert root.tag == "tv"
     channels = {c.get("id"): c for c in root.iter("channel")}
-    assert list(channels)[:3] == ["rai1", "canale5", "la7"]
+    # Rai 1 +1, ricavato da Rai 1, segue il suo canale base.
+    assert list(channels)[:4] == ["rai1", "rai1plus1", "canale5", "la7"]
     rai1 = channels["rai1"]
     assert [d.text for d in rai1.iter("display-name")] == ["Rai 1", "Rai 1 HD"]
     # Logo scaricato e pubblicato: indirizzo assoluto sul sito.
@@ -155,11 +156,20 @@ async def test_guide_and_channel_json(secret_settings):
 
     day = json.loads((api / "guide/2026-10-12.json").read_text())
     rows = {r["channel"]["id"]: r for r in day["channels"]}
-    assert list(rows)[:3] == ["rai1", "canale5", "la7"]
+    assert list(rows)[:4] == ["rai1", "rai1plus1", "canale5", "la7"]
     assert rows["rai1"]["channel"] == {
         "id": "rai1", "name": "Rai 1", "logo": "logos/rai1.png",
         "numbers": {"dtt": 1, "tivusat": 1, "sky": 101}, "sources": ["sky", "tivu"], "ids": {},
+        "timeshift": None,
     }
+    # Il +1 ha gli stessi programmi un'ora dopo, senza numeri propri.
+    plus1 = rows["rai1plus1"]
+    assert plus1["channel"]["name"] == "Rai 1 +1"
+    assert plus1["channel"]["numbers"] == {}
+    assert plus1["channel"]["timeshift"] == {"of": "rai1", "hours": 1}
+    assert plus1["channel"]["logo"] == "logos/rai1plus1.png"
+    assert [p["title"] for p in plus1["programmes"]] == [p["title"] for p in rows["rai1"]["programmes"]]
+    assert plus1["programmes"][1]["start"] == "2026-10-12T07:00:00+02:00"
     assert rows["rai1"]["programmes"][1]["start"] == "2026-10-12T06:00:00+02:00"
     assert rows["rai1"]["programmes"][1]["source"] == "tivu"
     # Il film della sera finisce il 13: compare in entrambi i giorni.
@@ -301,7 +311,7 @@ async def test_compatible_feeds(secret_settings):
     health = await run_build(settings, handler=handler)
     site = Path(settings.out_dir) / TOKEN
     assert [(f["scheme"], f["gz"], f["channels"]) for f in health["feeds"]] == [
-        ("seatv", "epg.xml.gz", 7),
+        ("seatv", "epg.xml.gz", 8),
         ("iptvorg", "epg-iptvorg.xml.gz", 4),
         ("epgshare", "epg-epgshare.xml.gz", 2),
     ]
@@ -309,14 +319,14 @@ async def test_compatible_feeds(secret_settings):
     root = ET.fromstring(gzip.decompress((site / "epg-iptvorg.xml.gz").read_bytes()))
     channel_ids = [c.get("id") for c in root.iter("channel")]
     # Rai 1 con tutti i suoi id iptv-org; un canale senza corrispondenza tiene il nostro id.
-    assert channel_ids[:4] == ["Rai1.it", "Rai1.it@SD", "Rai1.it@HD", "canale5"]
+    assert channel_ids[:5] == ["Rai1.it", "Rai1.it@SD", "Rai1.it@HD", "rai1plus1", "canale5"]
     assert "SkyUno.it@Plus1" in channel_ids
     # Il palinsesto si ripete per ogni id.
     titles = [p.findtext("title") for p in root.iter("programme") if p.get("channel") == "Rai1.it@HD"]
     assert titles == ["Speciale notte", "Tg1", "Unomattina", "Tg1", "Film della sera"]
 
     epgshare = ET.fromstring((site / "epg-epgshare.xml").read_bytes())
-    assert [c.get("id") for c in epgshare.iter("channel")][:2] == ["Rai.1.HD.it", "Canale.5.it"]
+    assert [c.get("id") for c in epgshare.iter("channel")][:3] == ["Rai.1.HD.it", "rai1plus1", "Canale.5.it"]
 
     rai1 = json.loads((site / "api/channels/rai1.json").read_text())["channel"]
     assert rai1["ids"] == {"iptvorg": ["Rai1.it", "Rai1.it@SD", "Rai1.it@HD"], "epgshare": ["Rai.1.HD.it"]}
@@ -328,4 +338,4 @@ async def test_compatible_feeds(secret_settings):
         return base(request)
 
     health = await run_build(settings, handler=lists_down)
-    assert [f["channels"] for f in health["feeds"]] == [7, 4, 2]
+    assert [f["channels"] for f in health["feeds"]] == [8, 4, 2]

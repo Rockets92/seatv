@@ -187,6 +187,15 @@ a { color: inherit; }
   box-shadow: inset 0 0 0 1px rgba(0, 194, 255, .35), 0 4px 14px rgba(0, 0, 0, .35);
 }
 .logo-tile.initials { background: var(--grad); color: #fff; font-weight: 800; font-size: 13px; letter-spacing: .5px; box-shadow: var(--glow); }
+/* Versione +1/+24 di un canale: il ritardo nell'angolo del logo. */
+.shift-tag {
+  position: absolute; right: 0; bottom: 0;
+  padding: 1px 5px; border-radius: 8px 0 0 0;
+  background: var(--grad); color: #fff; font-size: 11px; font-weight: 800; line-height: 1.3;
+}
+.shiftable { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.shiftable:focus-visible { outline: 2px solid var(--cyan); outline-offset: -2px; }
+.chan.shifted .chan-name, .lchan.shifted .lchan-name { color: var(--cyan); }
 
 /* --- barra filtri -------------------------------------------------- */
 

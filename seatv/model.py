@@ -34,6 +34,8 @@ class Channel:
     # Id dello stesso canale nelle liste IPTV diffuse, per schema:
     # {"iptvorg": ["Rai2.it", "Rai2.it@HD"], "epgshare": ["Rai.2.HD.it"]}.
     external: dict[str, list[str]] = field(default_factory=dict)
+    # Per i canali +1/+24: {"of": "skyuno", "hours": 1}, canale base e ritardo.
+    timeshift: dict | None = None
 
     def public(self) -> dict:
         return {
@@ -43,6 +45,7 @@ class Channel:
             "numbers": self.numbers,
             "sources": self.sources,
             "ids": self.external,
+            "timeshift": self.timeshift,
         }
 
 
@@ -139,7 +142,8 @@ class Guide:
         canali per fonte."""
         reused: dict[str, int] = {}
         for channel_id, old in previous.channels.items():
-            if channel_id in self.programmes:
+            # I +1/+24 si ricavano di nuovo dal canale base (vedi seatv.timeshift).
+            if channel_id in self.programmes or old.timeshift:
                 continue
             rows = [p for p in previous.programmes.get(channel_id, []) if p.stop > after and p.source in sources]
             if not rows:
@@ -155,13 +159,20 @@ class Guide:
 
     def sorted_channels(self, platform: str | None = None) -> list[Channel]:
         """Canali in ordine di numero: della piattaforma scelta, altrimenti del
-        digitale terrestre e poi gli altri per nome."""
+        digitale terrestre e poi gli altri per nome. Nell'elenco completo i
+        canali +1/+24 senza numero proprio seguono il loro canale base."""
         if platform:
             chosen = [c for c in self.channels.values() if platform in c.numbers]
             return sorted(chosen, key=lambda c: (c.numbers[platform], c.name.lower()))
+
+        def ref(c: Channel) -> tuple[Channel, int]:
+            if c.timeshift and not c.numbers and c.timeshift["of"] in self.channels:
+                return self.channels[c.timeshift["of"]], c.timeshift["hours"]
+            return c, 0
+
         return sorted(
             self.channels.values(),
-            key=lambda c: ("dtt" not in c.numbers, c.numbers.get("dtt", 0), c.name.lower()),
+            key=lambda c: ("dtt" not in ref(c)[0].numbers, ref(c)[0].numbers.get("dtt", 0), ref(c)[0].name.lower(), ref(c)[1]),
         )
 
     def overlapping(self, channel_id: str, start: datetime, end: datetime) -> list[Programme]:
