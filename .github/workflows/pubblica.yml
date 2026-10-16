@@ -16,10 +16,18 @@ name: Aggiorna e pubblica la guida
 
 on:
   schedule:
-    # 05:00 ora italiana: 03:00 UTC con l'ora legale, 04:00 UTC con l'ora solare.
-    # Gira a entrambe le ore e il primo passo tiene solo quella giusta.
-    - cron: "0 3 * * *"
-    - cron: "0 4 * * *"
+    # GitHub avvia i workflow pianificati anche con ore di ritardo, e a volte li
+    # salta, soprattutto allo scoccare dell'ora. Per questo ci sono più orari
+    # (UTC, a minuti non tondi): il primo che parte dopo le 05:00 di Roma e
+    # trova online una guida non di oggi fa l'aggiornamento, gli altri si
+    # fermano subito.
+    - cron: "7 3 * * *"
+    - cron: "37 3 * * *"
+    - cron: "7 4 * * *"
+    - cron: "37 4 * * *"
+    - cron: "7 6 * * *"
+    - cron: "7 9 * * *"
+    - cron: "7 13 * * *"
   workflow_dispatch:
   push:
     branches:
@@ -48,20 +56,29 @@ jobs:
       PAGES_PROJECT: ${{ vars.CLOUDFLARE_PAGES_PROJECT || 'seatv' }}
       SEATV_FEED_TOKEN: ${{ secrets.SEATV_FEED_TOKEN }}
     steps:
-      - name: Controlla l'ora (05:00 a Roma)
+      - name: Serve l'aggiornamento di oggi?
         id: ora
         env:
           EVENT: ${{ github.event_name }}
-          SCHEDULE: ${{ github.event.schedule }}
+          SITE: ${{ vars.SEATV_PUBLIC_URL || format('https://{0}.pages.dev', vars.CLOUDFLARE_PAGES_PROJECT || 'seatv') }}
         run: |
           run=true
+          today=$(TZ=Europe/Rome date +%F)
+          hour=$(TZ=Europe/Rome date +%-H)
           if [ "$EVENT" = "schedule" ]; then
-            offset=$(TZ=Europe/Rome date +%z)
-            if [ "$offset" = "+0200" ] && [ "$SCHEDULE" != "0 3 * * *" ]; then run=false; fi
-            if [ "$offset" = "+0100" ] && [ "$SCHEDULE" != "0 4 * * *" ]; then run=false; fi
+            if [ "$hour" -lt 5 ]; then
+              run=false
+              echo "A Roma sono le $(TZ=Europe/Rome date +%H:%M): si aggiorna dalle 05:00."
+            elif [ -n "$SEATV_FEED_TOKEN" ]; then
+              # Data della guida online (generated_at è in ora italiana).
+              published=$(curl -fsS --max-time 30 "$SITE/$SEATV_FEED_TOKEN/api/health.json" 2>/dev/null \
+                | python3 -c 'import json,sys; print(json.load(sys.stdin)["generated_at"][:10])' 2>/dev/null || echo "nessuna")
+              echo "Guida online del $published, oggi è il $today."
+              if [ "$published" = "$today" ]; then run=false; fi
+            fi
           fi
           echo "run=$run" >> "$GITHUB_OUTPUT"
-          echo "Fuso di Roma $(TZ=Europe/Rome date +%z), evento $EVENT, esecuzione: $run"
+          echo "Evento $EVENT, esecuzione: $run"
 
       - uses: actions/checkout@v4
         if: steps.ora.outputs.run == 'true'

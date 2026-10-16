@@ -76,7 +76,7 @@ Se i `tvg-id` della tua playlist sono come `Rai2.it` o `Rai2.it@HD` (iptv-org) u
 
 - **Repository pubblico.** I log di GitHub Actions sono visibili a tutti, ma i segreti vi compaiono sempre come `***`. Il sito generato non viene mai caricato come artefatto.
 - **60 giorni.** In un repository pubblico GitHub sospende i workflow pianificati dopo 60 giorni senza attività (nessun commit). Ti avvisa per email; si riattiva dalla scheda Actions con **Enable workflow**.
-- **Orario.** GitHub a volte avvia i workflow pianificati con qualche minuto di ritardo.
+- **Orario.** GitHub avvia i workflow pianificati anche con ore di ritardo e a volte li salta. Per questo il workflow è pianificato più volte al giorno (dalle 05:07 di Roma fino al primo pomeriggio): il primo giro che trova online una guida non di oggi la aggiorna, gli altri si fermano in pochi secondi. Per aggiornare subito: scheda **Actions** → **Aggiorna e pubblica la guida** → **Run workflow**.
 - **Domini di anteprima.** Ogni pubblicazione ha anche un indirizzo tipo `https://<codice>.seatv.pages.dev`: contiene gli stessi file, sempre sotto il token.
 - **Dominio tuo.** Se vuoi un indirizzo tipo `epg.tuodominio.it`: **Workers & Pages** → **seatv** → **Custom domains**, poi imposta `SEATV_PUBLIC_URL`.
 
