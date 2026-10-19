@@ -150,5 +150,7 @@ class SkySource:
         if bare:
             log.warning("sky: %d titoli con il solo episodio, senza nome della serie (es. %s)", len(bare), bare[:3])
             for event in BARE_SAMPLES:
-                log.warning("sky: esempio %s", json.dumps(event, ensure_ascii=False)[:3000])
+                slim = {k: v for k, v in event.items() if k not in ("channel", "content")}
+                slim["content"] = {k: v for k, v in (event.get("content") or {}).items() if k != "imagesMap"}
+                log.warning("sky: esempio %s", json.dumps(slim, ensure_ascii=False)[:3000])
         return programmes
