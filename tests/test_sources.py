@@ -109,3 +109,17 @@ def test_logo_headers_per_host():
 
     assert _headers("https://upload.wikimedia.org/x.png")["User-Agent"].startswith("seatv/")
     assert _headers("https://programmi.sky.it/logo/x.png")["User-Agent"].startswith("Mozilla/")
+
+
+def test_sky_episode_only_titles_get_series_name():
+    def event(title, series):
+        return {"eventTitle": title, "content": {"contentTitle": series}}
+
+    assert sky.event_title(event("Ep. 3", "Artis e Jess")) == "Artis e Jess - Ep. 3"
+    assert sky.event_title(event("S2 Ep. 24", "Grey's Anatomy")) == "Grey's Anatomy - S2 Ep. 24"
+    assert sky.event_title(event("Episodio 1", "Gomorra")) == "Gomorra - Episodio 1"
+    # Titoli veri, o già con il nome della serie, restano come sono.
+    assert sky.event_title(event("Il segreto", "Gomorra")) == "Il segreto"
+    assert sky.event_title(event("Gomorra Ep. 1", "Gomorra")) == "Gomorra Ep. 1"
+    assert sky.event_title(event("Ep. 3", "")) == "Ep. 3"
+    assert sky.event_title({"eventTitle": "Ep. 3"}) == "Ep. 3"

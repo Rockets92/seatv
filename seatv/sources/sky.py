@@ -6,6 +6,8 @@ I numeri restituiti sono quelli del decoder Sky (es. Rai 1 = 101).
 
 from __future__ import annotations
 
+import logging
+import re
 from datetime import date, datetime, time, timedelta, timezone
 
 import httpx
@@ -20,6 +22,21 @@ LOGO_HOSTS = ("https://programmi.sky.it", SITE_URL)
 # DTH = satellite.
 ENV = "DTH"
 LOGO_KEYS = ("logo", "logoPadding", "logoLight", "logoDark", "logoDarkPadding")
+# Titoli che sono solo il numero dell'episodio: "Ep. 3", "S2 Ep. 3", "Episodio 12".
+EPISODE_ONLY = re.compile(r"(?i)(s(t(agione)?)?\.?\s*\d+\s*[-,]?\s*)?(ep(isodio)?\.?\s*\d+)(\s*[-:–].*)?")
+
+log = logging.getLogger(__name__)
+
+
+def event_title(event: dict) -> str:
+    """Titolo del programma. Per alcune serie Sky mette in `eventTitle` solo
+    l'episodio ("Ep. 3") e il nome della serie in `content.contentTitle`:
+    allora il titolo diventa "Nome della serie - Ep. 3"."""
+    title = (event.get("eventTitle") or "").strip()
+    series = ((event.get("content") or {}).get("contentTitle") or "").strip()
+    if series and EPISODE_ONLY.fullmatch(title) and series.lower() not in title.lower():
+        return f"{series} - {title}"
+    return title
 
 
 def _utc(value: datetime) -> str:
@@ -59,7 +76,7 @@ def parse_channels(payload: dict) -> list[SourceChannel]:
 def parse_events(payload: dict, source_channel_id: str) -> list[SourceProgramme]:
     programmes = []
     for event in payload.get("events") or []:
-        title = (event.get("eventTitle") or "").strip()
+        title = event_title(event)
         if not title or not event.get("starttime") or not event.get("endtime"):
             continue
         try:
@@ -123,4 +140,8 @@ class SkySource:
             response.raise_for_status()
             return parse_events(response.json(), channel.source_id)
 
-        return await fetch_each_day(self.name, channels, days, self.concurrency, fetch)
+        programmes = await fetch_each_day(self.name, channels, days, self.concurrency, fetch)
+        bare = [p.title for p in programmes if EPISODE_ONLY.fullmatch(p.title)]
+        if bare:
+            log.warning("sky: %d titoli con il solo episodio, senza nome della serie (es. %s)", len(bare), bare[:3])
+        return programmes
