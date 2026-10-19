@@ -6,6 +6,7 @@ I numeri restituiti sono quelli del decoder Sky (es. Rai 1 = 101).
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from datetime import date, datetime, time, timedelta, timezone
@@ -26,6 +27,8 @@ LOGO_KEYS = ("logo", "logoPadding", "logoLight", "logoDark", "logoDarkPadding")
 EPISODE_ONLY = re.compile(r"(?i)(s(t(agione)?)?\.?\s*\d+\s*[-,]?\s*)?(ep(isodio)?\.?\s*\d+)(\s*[-:–].*)?")
 
 log = logging.getLogger(__name__)
+# Esempi di eventi rimasti con il solo episodio, per capire dove Sky mette la serie.
+BARE_SAMPLES: list[dict] = []
 
 
 def event_title(event: dict) -> str:
@@ -77,6 +80,8 @@ def parse_events(payload: dict, source_channel_id: str) -> list[SourceProgramme]
     programmes = []
     for event in payload.get("events") or []:
         title = event_title(event)
+        if EPISODE_ONLY.fullmatch(title) and len(BARE_SAMPLES) < 2:
+            BARE_SAMPLES.append(event)
         if not title or not event.get("starttime") or not event.get("endtime"):
             continue
         try:
@@ -144,4 +149,6 @@ class SkySource:
         bare = [p.title for p in programmes if EPISODE_ONLY.fullmatch(p.title)]
         if bare:
             log.warning("sky: %d titoli con il solo episodio, senza nome della serie (es. %s)", len(bare), bare[:3])
+            for event in BARE_SAMPLES:
+                log.warning("sky: esempio %s", json.dumps(event, ensure_ascii=False)[:3000])
         return programmes
