@@ -112,14 +112,18 @@ def test_logo_headers_per_host():
 
 
 def test_sky_episode_only_titles_get_series_name():
-    def event(title, series):
-        return {"eventTitle": title, "content": {"contentTitle": series}}
+    def event(title, series="", epg="", url=""):
+        return {"eventTitle": title, "epgEventTitle": epg, "content": {"contentTitle": series, "url": url}}
 
+    # Come arriva davvero da Sky: il nome della serie è in epgEventTitle.
+    masterchef = event("Ep. 15", "Ep. 15", "S15 Ep15 - MasterChef USA",
+                       "/programmi-tv/show/masterchef-usa/stagione-15/episodio-15/0aec")
+    assert sky.event_title(masterchef) == "MasterChef USA - Ep. 15"
+    # In mancanza, contentTitle o l'indirizzo della scheda.
     assert sky.event_title(event("Ep. 3", "Artis e Jess")) == "Artis e Jess - Ep. 3"
-    assert sky.event_title(event("S2 Ep. 24", "Grey's Anatomy")) == "Grey's Anatomy - S2 Ep. 24"
+    assert sky.event_title(event("Ep.01", "Ep.01", url="/programmi-tv/serie-tv/il-commissario-rex/stagione-2/episodio-1/x")) == "Il Commissario Rex - Ep.01"
     assert sky.event_title(event("Episodio 1", "Gomorra")) == "Gomorra - Episodio 1"
-    # Titoli veri, o già con il nome della serie, restano come sono.
-    assert sky.event_title(event("Il segreto", "Gomorra")) == "Il segreto"
-    assert sky.event_title(event("Gomorra Ep. 1", "Gomorra")) == "Gomorra Ep. 1"
-    assert sky.event_title(event("Ep. 3", "")) == "Ep. 3"
+    # Titoli veri restano come sono; senza nome della serie resta l'episodio.
+    assert sky.event_title(event("Il segreto", "Gomorra", "S1 Ep1 - Gomorra")) == "Il segreto"
+    assert sky.event_title(event("Ep. 3", "Ep. 3")) == "Ep. 3"
     assert sky.event_title({"eventTitle": "Ep. 3"}) == "Ep. 3"
