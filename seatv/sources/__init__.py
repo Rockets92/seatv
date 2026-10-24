@@ -64,6 +64,13 @@ class Source(Protocol):
     ) -> list[SourceProgramme]: ...
 
 
+# Titoli che sono solo il numero dell'episodio: "Ep. 3", "S2 Ep. 3",
+# "Episodio 12", "Episode 1", "Season 2 Episode 4", "Puntata 5".
+EPISODE_ONLY = re.compile(
+    r"(?i)((s|st|stagione|season)\.?\s*\d+\s*[-,]?\s*)?"
+    r"(ep|episodio|episode|puntata)\.?\s*\d+(\s*[-:–].*)?"
+)
+
 _HD = re.compile(r"\s*\bhd\b", re.IGNORECASE)
 
 # Nomi che le fonti scrivono in modo diverso per lo stesso canale.

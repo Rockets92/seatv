@@ -6,6 +6,7 @@ I numeri restituiti sono quelli del decoder Sky (es. Rai 1 = 101).
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 from datetime import date, datetime, time, timedelta, timezone
@@ -13,7 +14,7 @@ from datetime import date, datetime, time, timedelta, timezone
 import httpx
 
 from seatv.config import ROME
-from seatv.sources import SourceChannel, SourceProgramme, fetch_each_day
+from seatv.sources import EPISODE_ONLY, SourceChannel, SourceProgramme, fetch_each_day
 
 API_URL = "https://apid.sky.it/gtv/v1"
 SITE_URL = "https://guidatv.sky.it"
@@ -22,11 +23,11 @@ LOGO_HOSTS = ("https://programmi.sky.it", SITE_URL)
 # DTH = satellite.
 ENV = "DTH"
 LOGO_KEYS = ("logo", "logoPadding", "logoLight", "logoDark", "logoDarkPadding")
-# Titoli che sono solo il numero dell'episodio: "Ep. 3", "S2 Ep. 3", "Episodio 12".
-EPISODE_ONLY = re.compile(r"(?i)(s(t(agione)?)?\.?\s*\d+\s*[-,]?\s*)?(ep(isodio)?\.?\s*\d+)(\s*[-:–].*)?")
 
 log = logging.getLogger(__name__)
-_EPISODE_PREFIX = re.compile(r"(?i)^\s*(s\d+\s*)?ep\.?\s*\d+\s*[-–:]\s*")
+# Diagnosi: esempi di eventi rimasti con il solo episodio.
+SAMPLES: list[dict] = []
+_EPISODE_PREFIX = re.compile(r"(?i)^\s*((s|season)\.?\s*\d+\s*)?(ep|episode|episodio)\.?\s*\d+\s*[-–:]\s*")
 _SHOW_URL = re.compile(r"^/programmi-tv/[^/]+/([^/]+)/(stagione|episodio)-")
 
 
@@ -98,6 +99,11 @@ def parse_events(payload: dict, source_channel_id: str) -> list[SourceProgramme]
     programmes = []
     for event in payload.get("events") or []:
         title = event_title(event)
+        if EPISODE_ONLY.fullmatch(title) and len(SAMPLES) < 3 and not any(e.get("eventTitle") == event.get("eventTitle") for e in SAMPLES):
+            SAMPLES.append({k: v for k, v in event.items() if k not in ("channel", "content")} | {
+                "content": {k: v for k, v in (event.get("content") or {}).items() if k != "imagesMap"},
+                "channelName": (event.get("channel") or {}).get("name"),
+            })
         if not title or not event.get("starttime") or not event.get("endtime"):
             continue
         try:
@@ -165,4 +171,6 @@ class SkySource:
         bare = [p.title for p in programmes if EPISODE_ONLY.fullmatch(p.title)]
         if bare:
             log.warning("sky: %d titoli con il solo episodio, senza nome della serie (es. %s)", len(bare), bare[:3])
+            for event in SAMPLES:
+                log.warning("sky: esempio %s", json.dumps(event, ensure_ascii=False)[:2500])
         return programmes
