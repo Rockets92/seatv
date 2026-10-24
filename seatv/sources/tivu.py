@@ -6,7 +6,6 @@ L'API riporta anche la numerazione: `channel_dtt` (DTT) e `channel_sat` (Tivùsa
 
 from __future__ import annotations
 
-import json
 import logging
 from datetime import date, datetime
 
@@ -19,8 +18,6 @@ BASE_URL = "https://services.tivulaguida.it"
 TIME_FORMAT = "%d-%m-%Y %H:%M"
 
 log = logging.getLogger(__name__)
-# Diagnosi: esempi di eventi con il solo episodio nel titolo.
-SAMPLES: list[dict] = []
 
 
 def parse_channels(payload: dict, base_url: str = BASE_URL) -> list[SourceChannel]:
@@ -54,8 +51,6 @@ def parse_events(payload: dict, source_channel_id: str) -> list[SourceProgramme]
             stop = datetime.strptime(event["date_end"], TIME_FORMAT).replace(tzinfo=ROME)
         except (KeyError, ValueError):
             continue
-        if EPISODE_ONLY.fullmatch(program["title"].strip()) and len(SAMPLES) < 3:
-            SAMPLES.append(event)
         categories = program.get("categories") or []
         programmes.append(
             SourceProgramme(
@@ -99,6 +94,4 @@ class TivuSource:
         bare = [p.title for p in programmes if EPISODE_ONLY.fullmatch(p.title)]
         if bare:
             log.warning("tivu: %d titoli con il solo episodio (es. %s)", len(bare), bare[:3])
-            for event in SAMPLES:
-                log.warning("tivu: esempio %s", json.dumps(event, ensure_ascii=False)[:2500])
         return programmes

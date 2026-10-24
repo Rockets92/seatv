@@ -123,6 +123,9 @@ def test_sky_episode_only_titles_get_series_name():
     assert sky.event_title(event("Ep. 3", "Artis e Jess")) == "Artis e Jess - Ep. 3"
     assert sky.event_title(event("Ep.01", "Ep.01", url="/programmi-tv/serie-tv/il-commissario-rex/stagione-2/episodio-1/x")) == "Il Commissario Rex - Ep.01"
     assert sky.event_title(event("Episodio 1", "Gomorra")) == "Gomorra - Episodio 1"
+    assert sky.event_title(event("Episode 2", "Episode 2", "S1 Episode 2 - The Bear")) == "The Bear - Episode 2"
+    # Programmi sportivi: il nome è solo nell'indirizzo (/sport/<programma>/ep7/...).
+    assert sky.event_title(event("Ep.7", "Ep.7", "Ep.7", "/sport/tutti-i-gol-della-bundesliga/ep7/a978")) == "Tutti i Gol della Bundesliga - Ep.7"
     # Titoli veri restano come sono; senza nome della serie resta l'episodio.
     assert sky.event_title(event("Il segreto", "Gomorra", "S1 Ep1 - Gomorra")) == "Il segreto"
     assert sky.event_title(event("Ep. 3", "Ep. 3")) == "Ep. 3"

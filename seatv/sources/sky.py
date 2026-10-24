@@ -6,7 +6,6 @@ I numeri restituiti sono quelli del decoder Sky (es. Rai 1 = 101).
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from datetime import date, datetime, time, timedelta, timezone
@@ -25,10 +24,14 @@ ENV = "DTH"
 LOGO_KEYS = ("logo", "logoPadding", "logoLight", "logoDark", "logoDarkPadding")
 
 log = logging.getLogger(__name__)
-# Diagnosi: esempi di eventi rimasti con il solo episodio.
-SAMPLES: list[dict] = []
 _EPISODE_PREFIX = re.compile(r"(?i)^\s*((s|season)\.?\s*\d+\s*)?(ep|episode|episodio)\.?\s*\d+\s*[-–:]\s*")
-_SHOW_URL = re.compile(r"^/programmi-tv/[^/]+/([^/]+)/(stagione|episodio)-")
+# /programmi-tv/show/masterchef-usa/stagione-15/... o /sport/tutti-i-gol-della-bundesliga/ep7/...
+_SHOW_URL = re.compile(r"/([^/]+)/(stagione-\d+|episodio-\d+|ep-?\d+)(/|$)")
+
+
+# Parole che nei nomi ricavati dall'indirizzo restano minuscole.
+_MINOR_WORDS = {"a", "al", "con", "da", "dal", "dei", "del", "della", "delle", "degli", "di", "e", "gli",
+                "i", "il", "in", "la", "le", "lo", "per", "su", "tra"}
 
 
 def series_name(event: dict) -> str | None:
@@ -44,9 +47,10 @@ def series_name(event: dict) -> str | None:
     series = (content.get("contentTitle") or "").strip()
     if series and not EPISODE_ONLY.fullmatch(series):
         return series
-    m = _SHOW_URL.match(content.get("url") or "")
+    m = _SHOW_URL.search(content.get("url") or "")
     if m:
-        return m[1].replace("-", " ").title()
+        words = m[1].split("-")
+        return " ".join(w.capitalize() if i == 0 or w not in _MINOR_WORDS else w for i, w in enumerate(words))
     return None
 
 
@@ -99,11 +103,6 @@ def parse_events(payload: dict, source_channel_id: str) -> list[SourceProgramme]
     programmes = []
     for event in payload.get("events") or []:
         title = event_title(event)
-        if EPISODE_ONLY.fullmatch(title) and len(SAMPLES) < 3 and not any(e.get("eventTitle") == event.get("eventTitle") for e in SAMPLES):
-            SAMPLES.append({k: v for k, v in event.items() if k not in ("channel", "content")} | {
-                "content": {k: v for k, v in (event.get("content") or {}).items() if k != "imagesMap"},
-                "channelName": (event.get("channel") or {}).get("name"),
-            })
         if not title or not event.get("starttime") or not event.get("endtime"):
             continue
         try:
@@ -171,6 +170,4 @@ class SkySource:
         bare = [p.title for p in programmes if EPISODE_ONLY.fullmatch(p.title)]
         if bare:
             log.warning("sky: %d titoli con il solo episodio, senza nome della serie (es. %s)", len(bare), bare[:3])
-            for event in SAMPLES:
-                log.warning("sky: esempio %s", json.dumps(event, ensure_ascii=False)[:2500])
         return programmes
