@@ -13,7 +13,7 @@ from datetime import date, datetime, time, timedelta, timezone
 import httpx
 
 from seatv.config import ROME
-from seatv.sources import SourceChannel, SourceProgramme, fetch_each_day
+from seatv.sources import EPISODE_ONLY, SourceChannel, SourceProgramme, fetch_each_day
 
 API_URL = "https://apid.sky.it/gtv/v1"
 SITE_URL = "https://guidatv.sky.it"
@@ -22,12 +22,16 @@ LOGO_HOSTS = ("https://programmi.sky.it", SITE_URL)
 # DTH = satellite.
 ENV = "DTH"
 LOGO_KEYS = ("logo", "logoPadding", "logoLight", "logoDark", "logoDarkPadding")
-# Titoli che sono solo il numero dell'episodio: "Ep. 3", "S2 Ep. 3", "Episodio 12".
-EPISODE_ONLY = re.compile(r"(?i)(s(t(agione)?)?\.?\s*\d+\s*[-,]?\s*)?(ep(isodio)?\.?\s*\d+)(\s*[-:–].*)?")
 
 log = logging.getLogger(__name__)
-_EPISODE_PREFIX = re.compile(r"(?i)^\s*(s\d+\s*)?ep\.?\s*\d+\s*[-–:]\s*")
-_SHOW_URL = re.compile(r"^/programmi-tv/[^/]+/([^/]+)/(stagione|episodio)-")
+_EPISODE_PREFIX = re.compile(r"(?i)^\s*((s|season)\.?\s*\d+\s*)?(ep|episode|episodio)\.?\s*\d+\s*[-–:]\s*")
+# /programmi-tv/show/masterchef-usa/stagione-15/... o /sport/tutti-i-gol-della-bundesliga/ep7/...
+_SHOW_URL = re.compile(r"/([^/]+)/(stagione-\d+|episodio-\d+|ep-?\d+)(/|$)")
+
+
+# Parole che nei nomi ricavati dall'indirizzo restano minuscole.
+_MINOR_WORDS = {"a", "al", "con", "da", "dal", "dei", "del", "della", "delle", "degli", "di", "e", "gli",
+                "i", "il", "in", "la", "le", "lo", "per", "su", "tra"}
 
 
 def series_name(event: dict) -> str | None:
@@ -43,9 +47,10 @@ def series_name(event: dict) -> str | None:
     series = (content.get("contentTitle") or "").strip()
     if series and not EPISODE_ONLY.fullmatch(series):
         return series
-    m = _SHOW_URL.match(content.get("url") or "")
+    m = _SHOW_URL.search(content.get("url") or "")
     if m:
-        return m[1].replace("-", " ").title()
+        words = m[1].split("-")
+        return " ".join(w.capitalize() if i == 0 or w not in _MINOR_WORDS else w for i, w in enumerate(words))
     return None
 
 

@@ -6,15 +6,18 @@ L'API riporta anche la numerazione: `channel_dtt` (DTT) e `channel_sat` (Tivùsa
 
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime
 
 import httpx
 
 from seatv.config import ROME
-from seatv.sources import SourceChannel, SourceProgramme, fetch_each_day
+from seatv.sources import EPISODE_ONLY, SourceChannel, SourceProgramme, fetch_each_day
 
 BASE_URL = "https://services.tivulaguida.it"
 TIME_FORMAT = "%d-%m-%Y %H:%M"
+
+log = logging.getLogger(__name__)
 
 
 def parse_channels(payload: dict, base_url: str = BASE_URL) -> list[SourceChannel]:
@@ -87,4 +90,8 @@ class TivuSource:
             response.raise_for_status()
             return parse_events(response.json(), channel.source_id)
 
-        return await fetch_each_day(self.name, channels, days, self.concurrency, fetch)
+        programmes = await fetch_each_day(self.name, channels, days, self.concurrency, fetch)
+        bare = [p.title for p in programmes if EPISODE_ONLY.fullmatch(p.title)]
+        if bare:
+            log.warning("tivu: %d titoli con il solo episodio (es. %s)", len(bare), bare[:3])
+        return programmes
