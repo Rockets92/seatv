@@ -10,6 +10,7 @@ from datetime import date, datetime, time, timedelta, timezone
 import httpx
 
 from seatv import logo_index
+from seatv.align import align_hours
 from seatv.config import ROME, Settings, http_client
 from seatv.lcn import DTT_FALLBACK
 from seatv.model import Guide, Programme, SourceRun
@@ -136,6 +137,7 @@ async def collect(
             guide.runs.append(run)
         if settings.logo_index_url:
             await add_fallback_logos(guide, client, settings.logo_index_url)
+        await align_sources(guide, sources, client, days)
     finally:
         if owns_client:
             await client.aclose()
@@ -158,6 +160,21 @@ async def collect(
     return guide
 
 
+async def align_sources(guide: Guide, sources: list[Source], client: httpx.AsyncClient, days: list[date]) -> None:
+    """Orari di Tivù confrontati con Sky: dal cambio dell'ora alcuni editori
+    (Mediaset, Discovery...) arrivano da Tivù un'ora avanti."""
+    by_name = {source.name: source for source in sources}
+    if "tivu" not in by_name or "sky" not in by_name:
+        return
+    failed = {run.source for run in guide.runs if run.error}
+    if failed & {"tivu", "sky"}:
+        return
+    try:
+        await align_hours(guide, "tivu", by_name["sky"], client, days[:2])
+    except httpx.HTTPError as exc:
+        log.warning("confronto degli orari tivu/sky non riuscito: %s", exc)
+
+
 async def add_fallback_logos(guide: Guide, client: httpx.AsyncClient, url: str) -> None:
     """Aggiunge i loghi di iptv-org come riserva; un canale +1 usa quello del canale base."""
     try:
@@ -170,3 +187,4 @@ async def add_fallback_logos(guide: Guide, client: httpx.AsyncClient, url: str) 
         for logo in urls:
             if logo not in channel.logo_urls:
                 channel.logo_urls.append(logo)
+

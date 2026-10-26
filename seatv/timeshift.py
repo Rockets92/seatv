@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import replace
-from datetime import timedelta
+from datetime import timedelta, timezone
 
 from seatv.model import Guide
 from seatv.sources import channel_slug
@@ -74,6 +74,7 @@ def add_timeshifts(guide: Guide, previous: Guide | None = None) -> list[str]:
                 missing.append(name)
                 continue
             cid = f"{base.id}plus{hours}"
+            # In UTC: la notte del cambio dell'ora un'ora dopo resta un'ora dopo.
             delta = timedelta(hours=hours)
             shifted = []
             if cid not in guide.programmes:  # altrimenti la fonte dà il palinsesto vero
@@ -81,7 +82,7 @@ def add_timeshifts(guide: Guide, previous: Guide | None = None) -> list[str]:
                 old = previous.programmes.get(base.id, []) if previous is not None else []
                 if rows:
                     old = [p for p in old if p.start < rows[0].start]
-                shifted = [replace(p, channel_id=cid, start=p.start + delta, stop=p.stop + delta) for p in old + rows]
+                shifted = [replace(p, channel_id=cid, start=p.start.astimezone(timezone.utc) + delta, stop=p.stop.astimezone(timezone.utc) + delta) for p in old + rows]
                 if not shifted:
                     missing.append(name)
                     continue
