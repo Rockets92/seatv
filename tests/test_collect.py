@@ -80,9 +80,9 @@ async def test_tivu_and_sky(settings):
     assert rai1.logo_urls[0].startswith("https://services.tivulaguida.it/")
     assert ids(guide.sorted_channels("sky")) == ["skytg24", "rai1", "canale5", "skyuno", "skyunoplus1"]
 
-    # Il palinsesto di Rai 1 arriva già da Tivù: a Sky non viene richiesto.
+    # Il palinsesto di Rai 1 arriva già da Tivù: Sky serve solo a confrontare gli orari.
     sky_event_channels = {r.url.params.get("channels") for r in requests if r.url.path == "/gtv/v1/events"}
-    assert "8001" not in sky_event_channels
+    assert guide.programmes["rai1"][0].source == "tivu"
     # Canale 5 su Tivù non ha dati (errore 500), quindi si prova con Sky.
     assert "8005" in sky_event_channels
     assert guide.runs[1].programmes == 2
