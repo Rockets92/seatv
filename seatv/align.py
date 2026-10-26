@@ -47,7 +47,6 @@ def hour_offset(ours: list[Programme], reference: list[Programme]) -> int:
             target = p.start - timedelta(hours=h)
             if any(abs((target - s).total_seconds()) <= TOLERANCE for s in starts):
                 hours[h] += 1
-    log.info("DEBUG scarti %s: %s", ours[0].channel_id if ours else "?", dict(hours))
     if not hours:
         return 0
     (best, count), *others = hours.most_common()
