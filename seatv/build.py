@@ -18,7 +18,7 @@ import httpx
 
 from seatv.collect import collect, guide_days
 from seatv.config import Settings, http_client
-from seatv.external_ids import SCHEMES
+from seatv.external_ids import SCHEMES, external_candidates
 from seatv.export.site import copy_logos, write_site
 from seatv.logos import LogoCache
 from seatv.model import Guide
@@ -68,11 +68,28 @@ async def load_external_ids(settings: Settings, client: httpx.AsyncClient, cache
 
 
 def assign_external_ids(guide: Guide, external: dict[str, dict[str, list[str]]]) -> None:
+    """Prima i canali con lo stesso nome nella lista, poi gli altri con i nomi
+    alternativi (`external_candidates`), solo con id che nessun canale usa già."""
     for scheme, by_slug in external.items():
+        used: set[str] = set()
+        missing = []
         for channel in guide.channels.values():
             ids = by_slug.get(channel.id)
             if ids:
                 channel.external[scheme] = ids
+                used.update(ids)
+            else:
+                missing.append(channel)
+        for channel in missing:
+            for slug in external_candidates(channel.id)[1:]:
+                ids = [i for i in by_slug.get(slug, []) if i not in used]
+                if ids:
+                    channel.external[scheme] = ids
+                    used.update(ids)
+                    break
+        left = [c.name for c in guide.channels.values() if scheme not in c.external and not c.timeshift]
+        if left:
+            log.info("id %s: %d canali senza corrispondenza: %s", scheme, len(left), ", ".join(left))
 
 
 async def download_logos(guide: Guide, cache: LogoCache, concurrency: int = 8) -> dict[str, Path]:

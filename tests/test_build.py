@@ -2,6 +2,7 @@ import dataclasses
 import gzip
 import json
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
@@ -262,6 +263,7 @@ EPGSHARE = b"""<?xml version="1.0" encoding="UTF-8"?>
   <channel id="Rai.2.HD..102.it"><display-name>Rai 2 HD (102)</display-name></channel>
   <channel id="La.5.it"/>
   <channel id="Canale.5.it"><display-name lang="it">Canale 5</display-name></channel>
+  <channel id="DMAX.HD..170.it"/>
   <programme start="20261012060000 +0200" stop="20261012070000 +0200" channel="Rai.1.HD.it"><title>X</title></programme>
 </tv>
 """
@@ -292,6 +294,26 @@ def test_epgshare_ids():
     # Senza display-name il nome si ricava dall'id.
     assert ids["la5"] == ["La.5.it"]
     assert ids["canale5"] == ["Canale.5.it"]
+    # Il numero del canale in coda all'id non entra nel nome.
+    assert ids["dmax"] == ["DMAX.HD..170.it"]
+
+
+def test_external_ids_by_alternative_name():
+    from seatv.build import assign_external_ids
+    from seatv.external_ids import external_candidates
+    from seatv.model import Guide
+
+    assert external_candidates("discovery")[:2] == ["discovery", "discoverychannel"]
+    assert "hgtv" in external_candidates("hgtvitaly")
+
+    guide = Guide(generated_at=datetime(2026, 10, 28, tzinfo=timezone.utc))
+    for cid, name in (("discovery", "Discovery"), ("rai1", "Rai 1"), ("rai1tv", "Rai 1 TV")):
+        guide.add_channel(cid, name, "tivu", {}, [], [])
+    assign_external_ids(guide, {"epgshare": {"discoverychannel": ["Discovery.Channel.it"], "rai1": ["Rai.1.it"]}})
+    assert guide.channels["discovery"].external == {"epgshare": ["Discovery.Channel.it"]}
+    assert guide.channels["rai1"].external == {"epgshare": ["Rai.1.it"]}
+    # Un id già preso con il nome esatto non passa a un altro canale.
+    assert guide.channels["rai1tv"].external == {}
 
 
 @pytest.mark.anyio

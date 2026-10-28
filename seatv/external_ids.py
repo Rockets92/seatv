@@ -42,6 +42,31 @@ def external_slug(name: str) -> str:
     return channel_slug(re.sub(r"\([^)]*\)|\[[^\]]*\]", " ", name))
 
 
+# Nomi con cui le liste chiamano alcuni nostri canali.
+SYNONYMS = {
+    "discovery": ("discoverychannel",),
+    "tgcom24": ("tgcom",),
+    "20mediaset": ("20",),
+    "giallo": ("giallotv",),
+    "hgtvitaly": ("hgtv",),
+}
+_SUFFIXES = ("channel", "tv", "italia", "italy")
+
+
+def external_candidates(channel_id: str) -> list[str]:
+    """Slug da cercare in una lista per un nostro canale, il suo id per primo:
+    poi i sinonimi e le varianti con o senza "channel", "tv", "italia"
+    ("discovery" -> "discoverychannel", "hgtvitaly" -> "hgtv")."""
+    names = [channel_id, *SYNONYMS.get(channel_id, ())]
+    for name in list(names):
+        for suffix in _SUFFIXES:
+            if name.endswith(suffix) and len(name) > len(suffix) + 1:
+                names.append(name[: -len(suffix)])
+            else:
+                names.append(name + suffix)
+    return list(dict.fromkeys(names))
+
+
 def parse_iptv_org(channels_csv: str, feeds_csv: str) -> dict[str, list[str]]:
     """Id iptv-org per id SEA-TV: il canale (`Rai2.it`) e le sue varianti
     SD/HD (`Rai2.it@SD`); i +1 (`SkyUno.it@Plus1`) vanno al nostro `skyunoplus1`."""
@@ -118,7 +143,8 @@ def parse_xmltv_ids(content: bytes) -> dict[str, list[str]]:
         xml_id = element.get("id") or ""
         names = [d.text for d in element.iter("display-name") if d.text and d.text.strip()]
         # Senza nomi utili, il nome si ricava dall'id: "La.5.it" -> "La 5".
-        names.append(re.sub(r"\.[a-z]{2}$", "", xml_id).replace(".", " "))
+        # Il numero del canale in coda si toglie: "DMAX.HD..170.it" -> "DMAX HD".
+        names.append(re.sub(r"(\.\.+\d+)?\.[a-z]{2}$", "", xml_id).replace(".", " "))
         for slug in {external_slug(n) for n in names} - {""}:
             if xml_id not in result[slug]:
                 result[slug].append(xml_id)
