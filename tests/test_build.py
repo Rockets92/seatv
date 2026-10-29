@@ -361,3 +361,12 @@ async def test_compatible_feeds(secret_settings):
 
     health = await run_build(settings, handler=lists_down)
     assert [f["channels"] for f in health["feeds"]] == [8, 4, 2]
+
+
+def test_local_logos(tmp_path):
+    from seatv.build import local_logos
+
+    (tmp_path / "skycollection.png").write_bytes(b"\x89PNG\r\n\x1a\n" + b"0" * 20)
+    (tmp_path / "leggimi.txt").write_text("non è un'immagine")
+    assert local_logos(tmp_path) == {"skycollection": tmp_path / "skycollection.png"}
+    assert local_logos(tmp_path / "manca") == {}
