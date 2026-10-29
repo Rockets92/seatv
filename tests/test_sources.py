@@ -1,9 +1,11 @@
+import gzip
 from datetime import datetime, timezone
 
 from conftest import FIXTURES, load
 
 from seatv.sources import channel_slug
 from seatv.sources import sky
+from seatv.sources.epgshare import parse_epgshare
 from seatv.sources.tivu import parse_channels, parse_events
 from seatv.sources.xmltv import parse_xmltv, parse_xmltv_time
 
@@ -130,3 +132,26 @@ def test_sky_episode_only_titles_get_series_name():
     assert sky.event_title(event("Il segreto", "Gomorra", "S1 Ep1 - Gomorra")) == "Il segreto"
     assert sky.event_title(event("Ep. 3", "Ep. 3")) == "Ep. 3"
     assert sky.event_title({"eventTitle": "Ep. 3"}) == "Ep. 3"
+
+
+EPGSHARE_FEED = b"""<?xml version="1.0" encoding="UTF-8"?>
+<tv>
+  <channel id="Sky.Cinema.Collection.it"><display-name>Sky Cinema Collection</display-name></channel>
+  <channel id="Sky.Collection.it"><display-name>Sky Collection</display-name><icon src="https://example.org/skycollection.png"/></channel>
+  <programme start="20261029210000 +0100" stop="20261029230000 +0100" channel="Sky.Collection.it">
+    <title lang="it">The Last of Us</title><desc lang="it">Serie</desc>
+  </programme>
+  <programme start="20261029210000 +0100" stop="20261029230000 +0100" channel="Sky.Cinema.Collection.it">
+    <title lang="it">Un film</title>
+  </programme>
+</tv>"""
+
+
+def test_epgshare_only_listed_channels():
+    channels, programmes = parse_epgshare(gzip.compress(EPGSHARE_FEED))
+    assert [(c.source_id, c.name, c.channel_id, c.logo) for c in channels] == [
+        ("Sky.Collection.it", "Sky Collection", "skycollection", "https://example.org/skycollection.png")
+    ]
+    assert [(p.source_channel_id, p.title, p.description, p.start.isoformat()) for p in programmes] == [
+        ("Sky.Collection.it", "The Last of Us", "Serie", "2026-10-29T21:00:00+01:00")
+    ]
