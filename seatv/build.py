@@ -20,7 +20,7 @@ from seatv.collect import collect, guide_days
 from seatv.config import Settings, http_client
 from seatv.external_ids import SCHEMES, external_candidates
 from seatv.export.site import copy_logos, write_site
-from seatv.logos import LogoCache
+from seatv.logos import LogoCache, sniff
 from seatv.model import Guide
 
 log = logging.getLogger(__name__)
@@ -92,6 +92,18 @@ def assign_external_ids(guide: Guide, external: dict[str, dict[str, list[str]]])
             log.info("id %s: %d canali senza corrispondenza: %s", scheme, len(left), ", ".join(left))
 
 
+# Loghi messi a mano nel repository, per i canali che nessuna fonte ne dà uno:
+# il file si chiama come l'id del canale (es. skycollection.png) e vince su
+# quelli scaricati.
+LOCAL_LOGOS = Path(__file__).parent / "logos"
+
+
+def local_logos(directory: Path = LOCAL_LOGOS) -> dict[str, Path]:
+    if not directory.is_dir():
+        return {}
+    return {path.stem: path for path in sorted(directory.iterdir()) if path.is_file() and sniff(path.read_bytes()[:16])}
+
+
 async def download_logos(guide: Guide, cache: LogoCache, concurrency: int = 8) -> dict[str, Path]:
     """Scarica (o prende dalla cache) un logo per canale."""
     semaphore = asyncio.Semaphore(concurrency)
@@ -101,8 +113,9 @@ async def download_logos(guide: Guide, cache: LogoCache, concurrency: int = 8) -
             found = await cache.get(channel_id, urls) if urls else None
             return channel_id, found[0] if found else None
 
-    results = await asyncio.gather(*(one(c.id, c.logo_urls) for c in guide.channels.values()))
-    return {channel_id: path for channel_id, path in results if path}
+    local = {cid: path for cid, path in local_logos().items() if cid in guide.channels}
+    results = await asyncio.gather(*(one(c.id, c.logo_urls) for c in guide.channels.values() if c.id not in local))
+    return {channel_id: path for channel_id, path in results if path} | local
 
 
 async def build(
