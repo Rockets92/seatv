@@ -15,6 +15,7 @@ from seatv.config import ROME, Settings, http_client
 from seatv.lcn import DTT_FALLBACK
 from seatv.model import Guide, Programme, SourceRun
 from seatv.sources import Source, SourceChannel, clean_name
+from seatv.sources.epgshare import EpgshareSource
 from seatv.sources.sky import SkySource
 from seatv.sources.tivu import TivuSource
 from seatv.sources.xmltv import XmltvSource
@@ -30,6 +31,8 @@ def build_sources(settings: Settings) -> list[Source]:
             sources.append(TivuSource(concurrency=settings.http_concurrency, base_url=settings.tivu_url))
         elif name == "sky":
             sources.append(SkySource(concurrency=settings.http_concurrency))
+        elif name == "epgshare":
+            sources.append(EpgshareSource())
         elif name == "xmltv":
             if not settings.xmltv_url:
                 raise ValueError("la fonte xmltv richiede SEATV_XMLTV_URL")

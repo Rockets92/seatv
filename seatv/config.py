@@ -16,9 +16,9 @@ TOKEN_PATTERN = re.compile(r"[A-Za-z0-9_-]{16,128}")
 
 @dataclass(frozen=True)
 class Settings:
-    # Fonti da interrogare: "tivu", "sky", "xmltv". Se due fonti coprono lo
-    # stesso canale, vince la prima.
-    sources: tuple[str, ...] = ("tivu", "sky")
+    # Fonti da interrogare: "tivu", "sky", "epgshare", "xmltv". Se due fonti
+    # coprono lo stesso canale, vince la prima.
+    sources: tuple[str, ...] = ("tivu", "sky", "epgshare")
     xmltv_url: str | None = None
     # Indirizzo dell'API Tivù, da cambiare se il servizio si sposta.
     tivu_url: str = "https://services.tivulaguida.it"
