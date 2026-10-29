@@ -25,7 +25,7 @@ log = logging.getLogger(__name__)
 
 # Id del canale nel feed -> (nome nella guida, numeri per piattaforma).
 CHANNELS: dict[str, tuple[str, dict[str, int]]] = {
-    "Sky.Collection.it": ("Sky Collection", {}),
+    "Sky.Collection.it": ("Sky Collection", {"sky": 114}),
 }
 
 
