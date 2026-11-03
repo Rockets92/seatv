@@ -11,6 +11,7 @@ import asyncio
 import gzip
 import json
 import logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -67,6 +68,9 @@ async def load_external_ids(settings: Settings, client: httpx.AsyncClient, cache
     return result
 
 
+_SHIFTED_ID = re.compile(r"\+\s*(1|24)\b|plus\s*(1|24)\b", re.IGNORECASE)
+
+
 def assign_external_ids(guide: Guide, external: dict[str, dict[str, list[str]]]) -> None:
     """Prima i canali con lo stesso nome nella lista, poi gli altri con i nomi
     alternativi (`external_candidates`), solo con id che nessun canale usa già."""
@@ -90,6 +94,14 @@ def assign_external_ids(guide: Guide, external: dict[str, dict[str, list[str]]])
         left = [c.name for c in guide.channels.values() if scheme not in c.external and not c.timeshift]
         if left:
             log.info("id %s: %d canali senza corrispondenza: %s", scheme, len(left), ", ".join(left))
+        shifted = [c.name for c in guide.channels.values() if scheme not in c.external and c.timeshift]
+        if shifted:
+            log.info("id %s: %d canali +1/+24 senza corrispondenza: %s", scheme, len(shifted), ", ".join(shifted))
+        # Id +1/+24 della lista che nessun nostro canale usa: servono a capire
+        # come la lista chiama i canali +1 che non si abbinano.
+        spare = sorted({i for ids in by_slug.values() for i in ids if _SHIFTED_ID.search(i)} - used)
+        if spare:
+            log.info("id %s: %d id +1/+24 della lista non usati: %s", scheme, len(spare), ", ".join(spare))
 
 
 # Loghi messi a mano nel repository, per i canali che nessuna fonte ne dà uno:
