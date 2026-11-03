@@ -94,6 +94,9 @@ def assign_external_ids(guide: Guide, external: dict[str, dict[str, list[str]]])
         left = [c.name for c in guide.channels.values() if scheme not in c.external and not c.timeshift]
         if left:
             log.info("id %s: %d canali senza corrispondenza: %s", scheme, len(left), ", ".join(left))
+        matched = [f"{c.name}={c.external[scheme][0]}" for c in guide.channels.values() if scheme in c.external and c.timeshift]
+        if matched:
+            log.info("id %s: %d canali +1/+24 abbinati: %s", scheme, len(matched), ", ".join(matched))
         shifted = [c.name for c in guide.channels.values() if scheme not in c.external and c.timeshift]
         if shifted:
             log.info("id %s: %d canali +1/+24 senza corrispondenza: %s", scheme, len(shifted), ", ".join(shifted))

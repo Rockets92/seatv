@@ -49,6 +49,7 @@ SYNONYMS = {
     "20mediaset": ("20",),
     "giallo": ("giallotv",),
     "hgtvitaly": ("hgtv",),
+    "comedycentralplus1": ("comedyplus1",),
 }
 _SUFFIXES = ("channel", "tv", "italia", "italy")
 
