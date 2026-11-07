@@ -53,6 +53,13 @@ SYNONYMS = {
 }
 _SUFFIXES = ("channel", "tv", "italia", "italy")
 
+# Id da dare comunque, anche se la lista non li contiene: sono quelli che
+# usano le playlist (es. Sky Voices è "Sky.Voices.it" nelle liste M3U ma il
+# feed di epgshare01 non lo ha).
+FIXED_IDS: dict[str, dict[str, list[str]]] = {
+    "epgshare": {"skyvoices": ["Sky.Voices.it"]},
+}
+
 
 def external_candidates(channel_id: str) -> list[str]:
     """Slug da cercare in una lista per un nostro canale, il suo id per primo:
