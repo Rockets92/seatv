@@ -316,6 +316,17 @@ def test_external_ids_by_alternative_name():
     assert guide.channels["rai1tv"].external == {}
 
 
+def test_fixed_external_ids():
+    from seatv.build import assign_external_ids
+    from seatv.model import Guide
+
+    guide = Guide(generated_at=datetime(2026, 11, 7, tzinfo=timezone.utc))
+    guide.add_channel("skyvoices", "Sky Voices", "sky", {}, [], [])
+    # Sky Voices non c'è nel feed di epgshare01: prende comunque l'id delle playlist.
+    assign_external_ids(guide, {"epgshare": {"rai1": ["Rai.1.it"]}, "iptvorg": {}})
+    assert guide.channels["skyvoices"].external == {"epgshare": ["Sky.Voices.it"]}
+
+
 @pytest.mark.anyio
 async def test_compatible_feeds(secret_settings):
     settings = dataclasses.replace(secret_settings, external_ids=("iptvorg", "epgshare"))

@@ -19,7 +19,7 @@ import httpx
 
 from seatv.collect import collect, guide_days
 from seatv.config import Settings, http_client
-from seatv.external_ids import SCHEMES, external_candidates
+from seatv.external_ids import FIXED_IDS, SCHEMES, external_candidates
 from seatv.export.site import copy_logos, write_site
 from seatv.logos import LogoCache, sniff
 from seatv.model import Guide
@@ -91,6 +91,10 @@ def assign_external_ids(guide: Guide, external: dict[str, dict[str, list[str]]])
                     channel.external[scheme] = ids
                     used.update(ids)
                     break
+        for channel_id, ids in FIXED_IDS.get(scheme, {}).items():
+            channel = guide.channels.get(channel_id)
+            if channel is not None and scheme not in channel.external:
+                channel.external[scheme] = list(ids)
         left = [c.name for c in guide.channels.values() if scheme not in c.external and not c.timeshift]
         if left:
             log.info("id %s: %d canali senza corrispondenza: %s", scheme, len(left), ", ".join(left))
